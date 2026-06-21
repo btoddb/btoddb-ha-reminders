@@ -53,11 +53,23 @@ ATTR_MESSAGE = "message"
 ATTR_WHEN = "when"
 ATTR_IN_MINUTES = "in_minutes"
 
+def _optional_minutes(value: object) -> int | None:
+    """Coerce in_minutes, tolerating ''/None.
+
+    The agent's create_reminder function always passes ``in_minutes: "{{ in_minutes }}"``,
+    which renders to an empty string whenever the model omits it (i.e. every absolute
+    ``when`` request). Treat ''/None as "not given" rather than rejecting the call.
+    """
+    if value in (None, ""):
+        return None
+    return int(value)
+
+
 CREATE_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_MESSAGE): cv.string,
         vol.Optional(ATTR_WHEN): vol.Any(None, cv.string),
-        vol.Optional(ATTR_IN_MINUTES): vol.Any(None, vol.Coerce(int)),
+        vol.Optional(ATTR_IN_MINUTES): _optional_minutes,
     }
 )
 
@@ -140,8 +152,8 @@ def _async_register_service(hass: HomeAssistant, store: ReminderStore) -> None:
         # in_minutes wins if both are given (RM-4a): the home computes now + offset so
         # the model never does clock arithmetic.
         start = None
-        if in_minutes not in (None, ""):
-            start = now + timedelta(minutes=int(in_minutes))
+        if in_minutes is not None:
+            start = now + timedelta(minutes=in_minutes)
         elif when not in (None, ""):
             parsed = dt_util.parse_datetime(when)
             if parsed is not None:
