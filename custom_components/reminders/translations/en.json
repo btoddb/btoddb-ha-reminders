@@ -1,0 +1,52 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Reminders",
+        "description": "Reminders are delivered as a high-priority push to a notify service.",
+        "data": {
+          "notify_service": "Notify service"
+        },
+        "data_description": {
+          "notify_service": "The notify service to push due reminders to, e.g. notify.btoddb."
+        }
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Reminders is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Reminders",
+        "data": {
+          "notify_service": "Notify service"
+        },
+        "data_description": {
+          "notify_service": "The notify service to push due reminders to, e.g. notify.btoddb."
+        }
+      }
+    }
+  },
+  "services": {
+    "create": {
+      "name": "Create reminder",
+      "description": "Add a time-based reminder at an absolute time or a relative delay.",
+      "fields": {
+        "message": {
+          "name": "Message",
+          "description": "What to remind about, in the user's own words."
+        },
+        "when": {
+          "name": "When",
+          "description": "Absolute ISO 8601 local datetime for a specific clock time or date. Leave empty for relative delays and use in_minutes instead."
+        },
+        "in_minutes": {
+          "name": "In minutes",
+          "description": "Minutes from now, for relative delays. Takes priority over when when both are given."
+        }
+      }
+    }
+  }
+}

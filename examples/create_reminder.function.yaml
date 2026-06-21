@@ -1,0 +1,50 @@
+# Tuned create_reminder function for the Extended OpenAI Conversation integration
+# (jekalmin/extended_openai_conversation). Paste this into the conversation agent's
+# `functions` field (Settings -> Voice assistants -> your assistant -> edit).
+#
+# Why a dedicated typed function instead of a generic execute_services call: the
+# generic function only forwards entity_id and silently drops message / when /
+# in_minutes, so the reminder is created with no text and no time. (RM-5)
+#
+# Why response_variable is mandatory: without the returned tool result the model has no
+# signal that the reminder was written and will guess — saying "Done" or "I can't set
+# that" non-deterministically. The service returns {success, message, start}; tell the
+# model to echo `start` (already a spoken-language time) verbatim. (RM-9)
+#
+# Why in_minutes for relative delays: small models are unreliable at datetime math —
+# "remind me in 5 minutes" once landed at 3am. Have the model pass the offset and let
+# the home compute the time. (RM-4a)
+
+- spec:
+    name: create_reminder
+    description: >-
+      Create a reminder for the user. Use whenever the user asks to be reminded of
+      something. For a relative delay ("in 5 minutes", "in 2 hours", "in half an
+      hour") pass in_minutes (hours times 60) and do NOT compute a clock time
+      yourself. For a specific clock time or date ("at 6pm", "tomorrow at 9am",
+      "next Tuesday at 2pm") pass when as an absolute ISO 8601 local datetime
+      resolved from the current time shown in the system prompt. Always pass message.
+      The returned start field is already a natural spoken-language time (e.g.
+      "tomorrow at 6 PM") — repeat it back as-is, don't reformat it.
+    parameters:
+      type: object
+      properties:
+        when:
+          type: string
+          description: Absolute reminder time, ISO 8601 local (e.g. 2026-06-17T18:00:00). For specific clock times or dates.
+        in_minutes:
+          type: integer
+          description: Minutes from now, for relative delays ("in 5 minutes" -> 5, "in 2 hours" -> 120). Use this instead of when for relative requests; the home computes the time.
+        message:
+          type: string
+          description: What to remind the user about, in their own words.
+      required: [message]
+  function:
+    type: script
+    sequence:
+      - service: reminders.create
+        data:
+          when: "{{ when }}"
+          in_minutes: "{{ in_minutes }}"
+          message: "{{ message }}"
+        response_variable: _function_result

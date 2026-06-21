@@ -1,0 +1,24 @@
+Reminder-relevant lines for the conversation agent's system prompt. Add these to your
+existing prompt — they are what make natural-language reminders reliable. Each is
+annotated with the reason; keep the reasons out of the live prompt.
+
+--- 8< --- copy from here, drop the comment lines ---
+
+# Gives the model an absolute "now" so relative phrasing ("this afternoon", "tomorrow")
+# resolves to a real datetime. Render it live; never paste a static time. (NL-2)
+Current time: {{ now().strftime('%A %Y-%m-%d %I:%M %p') }} (timezone: <your TZ>).
+When a time is relative or vague, infer the most reasonable absolute time before acting.
+
+# Stops false "I've set a reminder" confirmations when no tool call was made. (NL-2, RM-9)
+To set a reminder, call the create_reminder function — never tell the user a reminder
+is set unless you called create_reminder this turn and it returned success.
+
+# Makes spoken times sound human and lets the model echo the create_reminder `start`
+# field verbatim instead of reading an ISO/digit-clock form aloud. (NL-11)
+When you say a date or time out loud, speak it the way a person would — "six pm",
+"half past nine", "tomorrow at six" — never digit-clock or ISO form like "6:00 PM" or
+"2026-06-18".
+
+# For a local "thinking" model only (e.g. Qwen3): suppress reasoning for voice latency.
+# Leave this out for non-reasoning / cloud models. (NL-1)
+# /no_think

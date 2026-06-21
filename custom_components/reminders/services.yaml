@@ -1,0 +1,37 @@
+create:
+  name: Create reminder
+  description: >-
+    Add a time-based reminder at an absolute time or a relative delay. Returns
+    {success, message, start} where start is a spoken-language time string the
+    conversation agent can echo back verbatim.
+  fields:
+    message:
+      name: Message
+      description: What to remind about, in the user's own words.
+      required: true
+      example: take out the trash
+      selector:
+        text:
+    when:
+      name: When
+      description: >-
+        Absolute ISO 8601 local datetime for a specific clock time or date
+        ("at 6pm", "tomorrow at 9am", "next Tuesday"). Leave empty for relative
+        delays and use in_minutes instead.
+      required: false
+      example: "2026-06-17T18:00:00"
+      selector:
+        text:
+    in_minutes:
+      name: In minutes
+      description: >-
+        Minutes from now, for relative delays ("in 5 minutes" -> 5, "in 2 hours"
+        -> 120). Lets the home compute the absolute time. Takes priority over when
+        when both are given.
+      required: false
+      example: 5
+      selector:
+        number:
+          min: 0
+          mode: box
+          unit_of_measurement: minutes
