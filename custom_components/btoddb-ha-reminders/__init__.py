@@ -1,4 +1,5 @@
-"""The Reminders integration.
+"""
+The Reminders integration.
 
 Time-based reminders set in natural language (by the conversation agent — see the
 README) and delivered as a high-priority push when due. This module wires up:
@@ -11,6 +12,7 @@ README) and delivered as a high-priority push when due. This module wires up:
 from __future__ import annotations
 
 import logging
+import os
 import uuid
 from datetime import timedelta
 
@@ -48,13 +50,21 @@ _LOGGER = logging.getLogger(__name__)
 PLATFORMS: list[Platform] = [Platform.CALENDAR]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
+# Frontend card: the built bundle in www/ is served at this URL and auto-registered
+# as a dashboard module, so users only hard-refresh — no Lovelace resource to add.
+CARD_URL_BASE = "/btoddb-ha-reminders"
+CARD_FILENAME = "btoddb-ha-reminders.js"
+_CARD_REGISTERED_KEY = f"{DOMAIN}_card_registered"
+
 SERVICE_CREATE = "create"
 ATTR_MESSAGE = "message"
 ATTR_WHEN = "when"
 ATTR_IN_MINUTES = "in_minutes"
 
+
 def _optional_minutes(value: object) -> int | None:
-    """Coerce in_minutes, tolerating ''/None.
+    """
+    Coerce in_minutes, tolerating ''/None.
 
     The agent's create_reminder function always passes ``in_minutes: "{{ in_minutes }}"``,
     which renders to an empty string whenever the model omits it (i.e. every absolute
@@ -83,6 +93,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     store = ReminderStore(hass)
     await store.async_load()
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = store
+
+    await _async_register_card(hass)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -120,6 +132,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     return True
+
+
+async def _async_register_card(hass: HomeAssistant) -> None:
+    """
+    Serve the Lovelace card bundle and auto-register it as a frontend module.
+
+    Idempotent: a static path can only be registered once, and ``single_config_entry``
+    means there is one entry anyway, but guard with a flag so a reload never re-registers.
+    """
+    if hass.data.get(_CARD_REGISTERED_KEY):
+        return
+
+    www_dir = os.path.join(os.path.dirname(__file__), "www")
+    # Ensure the directory exists so registering the static route never fails before
+    # the card has been built/deployed (scripts/deploy.sh fills it in).
+    await hass.async_add_executor_job(lambda: os.makedirs(www_dir, exist_ok=True))
+
+    from homeassistant.components.frontend import add_extra_js_url
+    from homeassistant.components.http import StaticPathConfig
+
+    await hass.http.async_register_static_paths(
+        [StaticPathConfig(CARD_URL_BASE, www_dir, cache_headers=False)]
+    )
+    add_extra_js_url(hass, f"{CARD_URL_BASE}/{CARD_FILENAME}")
+    hass.data[_CARD_REGISTERED_KEY] = True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -222,7 +259,7 @@ class ReminderDelivery:
                     },
                     blocking=True,
                 )
-            except Exception:  # noqa: BLE001 - one bad push shouldn't stall delivery
+            except Exception:
                 _LOGGER.exception("Failed to deliver reminder %r", event.summary)
 
         await self._store.async_set_watermark(now)

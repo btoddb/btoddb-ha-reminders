@@ -5,7 +5,8 @@ set -e
 cd "$(dirname "$0")/.."
 
 REMOTE="${HASS_REMOTE:-root@hass.homelab.lan}"
-REMOTE_PATH="/homeassistant/custom_components/btoddb-ha-reminders"
+CUSTOM_COMPONENT="btoddb-ha-reminders"
+REMOTE_PATH="/homeassistant/custom_components/${CUSTOM_COMPONENT}"
 
 echo "Deploying to ${REMOTE}:${REMOTE_PATH} ..."
 
@@ -14,7 +15,7 @@ rsync -av --delete \
     --exclude '*.pyc' \
     --exclude 'node_modules' \
     --exclude 'tests' \
-    custom_components/btoddb-ha-reminders/ \
+    custom_components/${CUSTOM_COMPONENT}/ \
     "${REMOTE}:${REMOTE_PATH}/"
 
 echo "Done. Restart Home Assistant to apply changes."

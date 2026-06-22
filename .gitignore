@@ -7,8 +7,8 @@ __pycache__
 node_modules
 
 # card build output (intermediate; deployed copy lives in www/)
-custom_components/btoddb-ha-reminders/card/room-climate-control-card.js
-custom_components/btoddb-ha-reminders/card/room-climate-control-card.js.map
+custom_components/btoddb-ha-reminders/card/btoddb-ha-reminders.js
+custom_components/btoddb-ha-reminders/card/btoddb-ha-reminders.js.map
 
 # local stuff
 devcontainer-lock.json

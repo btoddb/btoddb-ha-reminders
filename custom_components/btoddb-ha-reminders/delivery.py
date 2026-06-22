@@ -1,4 +1,5 @@
-"""Pure delivery logic — no Home Assistant imports (RM-7, RM-7b).
+"""
+Pure delivery logic — no Home Assistant imports (RM-7, RM-7b).
 
 This module is deliberately HA-free so its tests run under plain pytest. It owns the
 reminder event shape and the watermark math: given the stored watermark and the set of
@@ -29,14 +30,15 @@ class ReminderEvent:
 
 
 def effective_watermark(stored: datetime | None, now: datetime) -> datetime:
-    """Resolve the effective lower bound of the delivery window.
+    """
+    Resolve the effective lower bound of the delivery window.
 
     ``max(stored_or_fallback, now - 6h)`` — the 6h floor (RM-7b) only kicks in when the
     stored watermark is older than that or missing entirely (RM-7).
     """
     base = stored if stored is not None else now - FRESH_FALLBACK
     floor = now - CATCHUP_FLOOR
-    return base if base > floor else floor
+    return max(floor, base)
 
 
 def due_events(

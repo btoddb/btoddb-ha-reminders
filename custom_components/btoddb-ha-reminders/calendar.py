@@ -1,4 +1,5 @@
-"""Calendar platform — a component-owned ``calendar.reminders`` entity (RM-8).
+"""
+Calendar platform — a component-owned ``calendar.reminders`` entity (RM-8).
 
 Backed by :class:`ReminderStore`, so the existing storage-mode Reminders dashboard's
 built-in calendar card keeps working unchanged. The entity refreshes whenever the store
@@ -76,7 +77,9 @@ class ReminderCalendarEntity(CalendarEntity):
         self, hass: HomeAssistant, start_date: datetime, end_date: datetime
     ) -> list[CalendarEvent]:
         """Return reminders within the requested window."""
-        return [_to_calendar_event(e) for e in self._store.in_range(start_date, end_date)]
+        return [
+            _to_calendar_event(e) for e in self._store.in_range(start_date, end_date)
+        ]
 
     async def async_delete_event(
         self,

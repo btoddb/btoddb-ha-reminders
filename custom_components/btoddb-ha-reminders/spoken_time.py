@@ -1,4 +1,5 @@
-"""Pure spoken-time formatting — no Home Assistant imports (RM-9, NL-11).
+"""
+Pure spoken-time formatting — no Home Assistant imports (RM-9, NL-11).
 
 Renders a reminder's start as a natural spoken-language string ("tomorrow at 6 PM")
 rather than a raw datetime, so the conversation agent can echo it verbatim instead of
@@ -12,7 +13,8 @@ from datetime import datetime
 
 
 def format_spoken_time(dt: datetime, now: datetime) -> str:
-    """Format ``dt`` relative to ``now`` as a spoken-language time string.
+    """
+    Format ``dt`` relative to ``now`` as a spoken-language time string.
 
     - Minutes are omitted on the hour ("6 PM", not "6:00 PM").
     - "today" / "tomorrow" for 0 / 1 days out.

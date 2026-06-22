@@ -1,4 +1,5 @@
-"""Config flow for the Reminders integration.
+"""
+Config flow for the Reminders integration.
 
 A single config entry. The only setting is the notify target the delivery loop pushes
 to (RM-6); it's a plain service string (e.g. ``notify.btoddb``) so the component is

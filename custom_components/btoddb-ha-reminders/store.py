@@ -1,4 +1,5 @@
-"""Persistence for reminder events and the delivery watermark (.storage/reminders).
+"""
+Persistence for reminder events and the delivery watermark (.storage/reminders).
 
 This is the storage **seam**: the create service, the calendar entity, and the
 delivery loop all go through ``ReminderStore`` and never touch storage directly. A

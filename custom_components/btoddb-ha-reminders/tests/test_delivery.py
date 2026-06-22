@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from conftest import load_module
 
@@ -11,12 +11,14 @@ ReminderEvent = delivery.ReminderEvent
 due_events = delivery.due_events
 effective_watermark = delivery.effective_watermark
 
-TZ = timezone.utc
+TZ = UTC
 NOW = datetime(2026, 6, 21, 12, 0, tzinfo=TZ)
 
 
 def _ev(uid, minutes_from_now):
-    return ReminderEvent(uid=uid, summary=uid, start=NOW + timedelta(minutes=minutes_from_now))
+    return ReminderEvent(
+        uid=uid, summary=uid, start=NOW + timedelta(minutes=minutes_from_now)
+    )
 
 
 def test_missing_watermark_falls_back_two_minutes():

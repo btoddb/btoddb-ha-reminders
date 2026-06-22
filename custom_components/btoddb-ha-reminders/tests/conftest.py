@@ -1,4 +1,5 @@
-"""Import shim so the pure modules load without Home Assistant.
+"""
+Import shim so the pure modules load without Home Assistant.
 
 ``spoken_time`` and ``delivery`` import nothing from Home Assistant and nothing from
 the package ``__init__`` (which does). Loading them by file path bypasses the package
