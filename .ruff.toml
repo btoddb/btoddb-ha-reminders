@@ -47,5 +47,5 @@ max-complexity = 25
     "S101",    # assert used for type-narrowing invariants
 ]
 "custom_components/btoddb-ha-reminders/calendar.py" = [
-    "ARG002",  # CalendarEntity calls async_get_events/async_delete_event's unused args by keyword
+    "ARG002",  # async_delete_event's unused recurrence_id/recurrence_range are passed by keyword
 ]
