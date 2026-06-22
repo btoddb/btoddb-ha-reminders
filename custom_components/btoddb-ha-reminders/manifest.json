@@ -1,6 +1,6 @@
 {
-  "domain": "reminders",
-  "name": "Reminders",
+  "domain": "btoddb-ha-reminders",
+  "name": "BToddB Reminders",
   "codeowners": [
     "@btoddb"
   ],
@@ -9,12 +9,12 @@
     "frontend",
     "http"
   ],
-  "documentation": "https://github.com/btoddb/ha-reminders",
+  "documentation": "https://github.com/btoddb/btoddb-ha-reminders",
   "integration_type": "service",
   "iot_class": "local_push",
-  "issue_tracker": "https://github.com/btoddb/ha-reminders/issues",
+  "issue_tracker": "https://github.com/btoddb/btoddb-ha-reminders/issues",
   "loggers": [
-    "custom_components.reminders"
+    "custom_components.btoddb-ha-reminders"
   ],
   "requirements": [],
   "single_config_entry": true,
