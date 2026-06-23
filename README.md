@@ -6,8 +6,8 @@ conversation agent (an LLM), not by rigid exact-match sentences, so any phrasing
 works: *"remind me to take out the trash at 6pm"*, *"don't let me forget to call mom in
 two hours"*.
 
-This integration owns the **engine**: a `reminders.create` service, a
-`calendar.reminders` calendar entity, and a once-a-minute delivery loop that survives
+This integration owns the **engine**: a `btoddb_ha_reminders.create` service, a
+`calendar.btoddb_reminders` calendar entity, and a once-a-minute delivery loop that survives
 restarts. It does **not** parse language itself — that's the conversation agent's job,
 and wiring it up well is the part that takes tuning. **Read
 [Wiring up the conversation agent](#wiring-up-the-conversation-agent) — it's the
@@ -15,11 +15,11 @@ difference between reminders that work and reminders that randomly fail.**
 
 ## What you get
 
-- **`reminders.create`** service — `message`, plus **either** `when` (absolute ISO 8601
+- **`btoddb_ha_reminders.create`** service — `message`, plus **either** `when` (absolute ISO 8601
   local datetime) **or** `in_minutes` (relative offset). Returns
   `{success, message, start}`, where `start` is a spoken-language time string
   ("tomorrow at 6 PM") for the agent to read back.
-- **`calendar.reminders`** — a calendar entity listing upcoming reminders (use it with
+- **`calendar.btoddb_reminders`** — a calendar entity listing upcoming reminders (use it with
   a calendar dashboard card).
 - **Delivery loop** — polls every minute and on startup; pushes any newly-due reminder
   to your configured notify service as a high-priority notification. A durable,
@@ -35,7 +35,7 @@ difference between reminders that work and reminders that randomly fail.**
 
 ### Manual
 
-Copy `custom_components/reminders/` into your HA config's `custom_components/` directory
+Copy `custom_components/btoddb_ha_reminders/` into your HA config's `custom_components/` directory
 and restart.
 
 ### Configure
@@ -47,7 +47,7 @@ can change it later from the integration's **Configure** button.
 ## Wiring up the conversation agent
 
 The component is only half of working reminders; the other half is a conversation agent
-configured to call `reminders.create` correctly. This is the part that took real tuning
+configured to call `btoddb_ha_reminders.create` correctly. This is the part that took real tuning
 — each note below is something that *failed* before it was fixed, so don't skip them.
 Reference artifacts you can copy:
 
@@ -109,9 +109,9 @@ tool call at all**. Cap lookback: set `context_threshold` **below the system-pro
 size** (≈1000) with `context_truncate_strategy: clear`. Cloud models (e.g. GPT-class)
 are far less prone to this and tolerate a moderate value (≈3000) for natural follow-ups.
 
-### 7. Expose `calendar.reminders` to the agent; keep the allowlist tight
+### 7. Expose `calendar.btoddb_reminders` to the agent; keep the allowlist tight
 
-Expose `calendar.reminders` to the conversation assistant. Exposing fewer entities
+Expose `calendar.btoddb_reminders` to the conversation assistant. Exposing fewer entities
 overall measurably improves small-model reliability — don't expose the whole house.
 
 ### 8. (Optional) Typing path and dashboard
@@ -119,7 +119,7 @@ overall measurably improves small-model reliability — don't expose the whole h
 To set reminders by typing, point a text helper's changes at your conversation agent —
 an automation that sends a non-empty `input_text` value to `conversation.process`
 (prefixed e.g. `Set a reminder:`) and then clears the box — and put that box plus a
-calendar card bound to `calendar.reminders` on a dashboard. The typed path must go
+calendar card bound to `calendar.btoddb_reminders` on a dashboard. The typed path must go
 through the agent (the LLM does the parsing); the component can't parse language itself.
 
 ### Keep your prompt/functions under version control

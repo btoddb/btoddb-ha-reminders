@@ -13,7 +13,8 @@ place. This runs alongside the existing **time-based** reminders
 ## Why a separate mechanism
 
 Time reminders work because *time* is a scalar that advances monotonically: a calendar
-event stores the start time and `Reminder - deliver to phone` polls `calendar.reminders`
+event stores the start time and `Reminder - deliver to phone` polls
+`calendar.btoddb_reminders`
 every minute against a watermark. A location reminder's trigger is a discrete **zone
 enter/leave event** for a tracked person — there's nothing to poll — so it needs its own
 storage (a queue of pending reminders) and its own trigger (person zone change).

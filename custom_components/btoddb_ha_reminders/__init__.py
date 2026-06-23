@@ -6,7 +6,7 @@ README) and delivered as a high-priority push when due. This module wires up:
 
 - the ``btoddb_ha_reminders.create`` service (RM-5) which returns a spoken-time response
   (RM-9);
-- a component-owned ``calendar.reminders`` entity (calendar platform);
+- a component-owned ``calendar.btoddb_reminders`` entity (calendar platform);
 - a once-a-minute delivery loop with a durable, 6h-clamped watermark
   (RM-6, RM-7, RM-7b).
 """
@@ -186,7 +186,7 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
 
 @callback
 def _async_register_service(hass: HomeAssistant, store: ReminderStore) -> None:
-    """Register ``reminders.create`` (idempotent; single config entry)."""
+    """Register ``btoddb_ha_reminders.create`` (idempotent; single config entry)."""
     if hass.services.has_service(DOMAIN, SERVICE_CREATE):
         return
 

@@ -1,7 +1,7 @@
 # Reminders — component spec
 
-This is the **engine** side of reminders: the `reminders.create` service, the
-`calendar.reminders` storage, and the delivery loop, as implemented by this
+This is the **engine** side of reminders: the `btoddb_ha_reminders.create` service, the
+`calendar.btoddb_reminders` storage, and the delivery loop, as implemented by this
 integration. The **natural-language** side (how a conversation agent is prompted and
 wired to call the service — RM-1..RM-4, NL-*) lives with the Home Assistant deployment
 that installs this component; see the [README](../../README.md) for the recipe.
@@ -17,12 +17,12 @@ as a minutes offset (`in_minutes`); the component computes `now() + offset`. The
 minutes" once landed at 3am). A specific clock time or date is passed as an absolute
 local datetime (`when`). `in_minutes` takes priority if both are supplied.
 
-**RM-5.** `reminders.create` accepts `message`, and **either** `when` (absolute ISO
+**RM-5.** `btoddb_ha_reminders.create` accepts `message`, and **either** `when` (absolute ISO
 8601 local datetime) **or** `in_minutes` (offset). It resolves the start time from
 whichever was supplied and stores a reminder event. A naive `when` (no offset) is
 interpreted in HA's configured time zone.
 
-**RM-9 (constraint).** `reminders.create` returns response data
+**RM-9 (constraint).** `btoddb_ha_reminders.create` returns response data
 (`{success, message, start}`, via `SupportsResponse.ONLY`). Without a returned tool
 result the conversation agent has no signal and guesses whether the reminder was set,
 non-deterministically confirming or denying even when the event was stored every time.
@@ -35,7 +35,7 @@ instead of reading an ISO/digit-clock form aloud.
 ## Storage
 
 **RM-8a.** Reminders are stored by the component (`.storage/reminders`) and surfaced as
-a **`calendar.reminders`** calendar entity (a 1-minute event per reminder), so a
+a **`calendar.btoddb_reminders`** calendar entity (a 1-minute event per reminder), so a
 built-in calendar dashboard card shows upcoming reminders. The storage layer is a
 **seam**: a future option to target a pre-existing calendar swaps the backend without
 changing the service or delivery loop. (The user-facing dashboard itself — RM-8 — is a

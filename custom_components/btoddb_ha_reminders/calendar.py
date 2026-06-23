@@ -1,5 +1,5 @@
 """
-Calendar platform — a component-owned ``calendar.reminders`` entity (RM-8).
+Calendar platform — a component-owned ``calendar.btoddb_reminders`` entity (RM-8).
 
 Backed by :class:`ReminderStore`, so the existing storage-mode Reminders dashboard's
 built-in calendar card keeps working unchanged. The entity refreshes whenever the store
@@ -54,10 +54,10 @@ def _to_calendar_event(event: ReminderEvent) -> CalendarEvent:
 
 
 class ReminderCalendarEntity(CalendarEntity):
-    """The ``calendar.reminders`` entity."""
+    """The ``calendar.btoddb_reminders`` entity."""
 
     _attr_has_entity_name = False
-    _attr_name = CALENDAR_ENTITY_NAME  # -> entity_id calendar.reminders
+    _attr_name = CALENDAR_ENTITY_NAME  # -> entity_id calendar.btoddb_reminders
     _attr_icon = "mdi:alarm"
     _attr_should_poll = False
     _attr_supported_features = CalendarEntityFeature.DELETE_EVENT

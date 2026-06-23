@@ -3,8 +3,8 @@
 // Two jobs, using stock Home Assistant web components (ha-card, ha-icon-button,
 // ha-icon, mwc-button) where they're reliably loaded, and native inputs for the
 // add row so the message and datetime fields always render:
-//   1. Type a new reminder (message + datetime) and call `reminders.create`.
-//   2. List upcoming reminders, read from the `calendar.reminders` entity, with a
+//   1. Type a new reminder (message + datetime) and call `btoddb_ha_reminders.create`.
+//   2. List upcoming reminders, read from the `calendar.btoddb_reminders` entity, with a
 //      per-row delete button (calendar/event/delete).
 //
 // The list is fetched from the calendar REST API and refreshed whenever the
@@ -51,7 +51,7 @@ interface ReminderItem {
   start: Date;
 }
 
-const DEFAULT_ENTITY = "calendar.reminders";
+const DEFAULT_ENTITY = "calendar.btoddb_reminders";
 
 const pad = (n: number): string => String(n).padStart(2, "0");
 

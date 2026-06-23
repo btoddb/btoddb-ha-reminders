@@ -8,7 +8,7 @@ The `btoddb-reminders-card` Lovelace card for the Reminders integration.
   calls the **response-only** `btoddb_ha_reminders.create` service (`returnResponse` must be
   `true`). The message uses a styled native `<input>` rather than `ha-textfield` so it
   always renders even where that HA element isn't loaded.
-- A list of upcoming reminders read from the `calendar.reminders` entity via the
+- A list of upcoming reminders read from the `calendar.btoddb_reminders` entity via the
   calendar REST API (`GET calendars/<entity>?start=&end=`), each row with an
   `ha-icon-button` that deletes via the `calendar/event/delete` websocket command.
 - The list refreshes when the calendar entity's `last_updated` changes (add / fire /

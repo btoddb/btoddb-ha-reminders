@@ -33,5 +33,6 @@ STORAGE_VERSION = 1
 DELIVERY_INTERVAL_MINUTES = 1
 
 # The calendar entity is named "BToddB Reminders" so its entity_id resolves to
-# calendar.reminders, keeping the existing dashboard calendar card (RM-8) working.
+# calendar.btoddb_reminders, keeping the existing dashboard calendar card (RM-8)
+# working.
 CALENDAR_ENTITY_NAME = "BToddB Reminders"
