@@ -1,7 +1,8 @@
 // Entry point for the btoddb-ha-reminders Lovelace card bundle.
 //
-// The integration serves this bundle and auto-registers it as a frontend module,
-// so loading it just needs a browser hard-refresh — no Lovelace resource to add.
+// The integration serves this bundle and auto-registers it as a Lovelace
+// resource, so loading it just needs a browser hard-refresh — no manual resource
+// to add.
 //
 // The version string below is bumped automatically by scripts/deploy.sh (it greps
 // for the first `vX.Y.Z`), so you can confirm in the console which build loaded.

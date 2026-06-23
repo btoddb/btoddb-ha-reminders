@@ -13,6 +13,7 @@ README) and delivered as a high-priority push when due. This module wires up:
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import uuid
 from datetime import timedelta
@@ -22,6 +23,8 @@ from typing import TYPE_CHECKING
 import voluptuous as vol
 from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.components.http import StaticPathConfig
+from homeassistant.components.lovelace import LOVELACE_DATA
+from homeassistant.components.lovelace.resources import ResourceStorageCollection
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, Platform
 from homeassistant.core import (
     CoreState,
@@ -60,10 +63,11 @@ PLATFORMS: list[Platform] = [Platform.CALENDAR]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 # Frontend card: the built bundle in www/ is served at this URL and auto-registered
-# as a dashboard module, so users only hard-refresh — no Lovelace resource to add.
+# as a Lovelace resource, so users only hard-refresh — no manual resource to add.
 CARD_URL_BASE = "/btoddb-ha-reminders"
 CARD_FILENAME = "btoddb-ha-reminders.js"
-_CARD_REGISTERED_KEY = f"{DOMAIN}_card_registered"
+# A static path can only be registered once per HA run; guard with this flag.
+_CARD_STATIC_PATH_KEY = f"{DOMAIN}_card_static_path"
 
 SERVICE_CREATE = "create"
 ATTR_MESSAGE = "message"
@@ -144,17 +148,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
+def _card_digest(path: Path) -> str:
+    """Short content hash of the card bundle, used as a cache-busting query param."""
+    return hashlib.sha256(path.read_bytes()).hexdigest()[:8]
+
+
 async def _async_register_card(hass: HomeAssistant) -> None:
     """
-    Serve the Lovelace card bundle and auto-register it as a frontend module.
+    Make the card available to dashboards without manual resource setup.
 
-    Idempotent: a static path can only be registered once, and
-    ``single_config_entry`` means there is one entry anyway, but guard with a flag
-    so a reload never re-registers.
+    The card is registered as a Lovelace *resource*, not an extra frontend module
+    (add_extra_js_url): extra modules are baked into index.html at render time,
+    and HA's service worker caches dashboard pages stale-while-revalidate. A page
+    rendered while HA was still starting (this integration not yet set up) lacks
+    the module import, and clients keep getting that cached copy — cards
+    intermittently fail with "custom element doesn't exist: btoddb-reminders-card"
+    until the cache turns over. Resources are fetched over websocket at dashboard
+    load, so they can't go stale with the page. The content-hash query param busts
+    HTTP/service-worker caches whenever the bundle changes.
     """
-    if hass.data.get(_CARD_REGISTERED_KEY):
-        return
-
     www_dir = Path(__file__).parent / "www"
     # Ensure the directory exists so registering the static route never fails before
     # the card has been built/deployed (scripts/deploy.sh fills it in).
@@ -162,11 +174,38 @@ async def _async_register_card(hass: HomeAssistant) -> None:
         lambda: www_dir.mkdir(parents=True, exist_ok=True)
     )
 
-    await hass.http.async_register_static_paths(
-        [StaticPathConfig(CARD_URL_BASE, str(www_dir), cache_headers=False)]
-    )
-    add_extra_js_url(hass, f"{CARD_URL_BASE}/{CARD_FILENAME}")
-    hass.data[_CARD_REGISTERED_KEY] = True
+    # The static path can only be registered once per HA run; the resource
+    # reconciliation below is idempotent and re-runs on every entry reload so a
+    # rebuilt bundle's new hash is picked up.
+    if not hass.data.get(_CARD_STATIC_PATH_KEY):
+        await hass.http.async_register_static_paths(
+            [StaticPathConfig(CARD_URL_BASE, str(www_dir), cache_headers=False)]
+        )
+        hass.data[_CARD_STATIC_PATH_KEY] = True
+
+    card_path = www_dir / CARD_FILENAME
+    try:
+        digest = await hass.async_add_executor_job(_card_digest, card_path)
+    except OSError:
+        _LOGGER.exception("Card bundle missing or unreadable: %s", card_path)
+        return
+    base_url = f"{CARD_URL_BASE}/{CARD_FILENAME}"
+    url = f"{base_url}?v={digest}"
+
+    resources = hass.data[LOVELACE_DATA].resources
+    if not isinstance(resources, ResourceStorageCollection):
+        # Resources are YAML-managed (read-only to us); fall back to the
+        # index-injected module and accept the stale-index race.
+        add_extra_js_url(hass, url)
+        return
+
+    await resources.async_get_info()  # force-load the collection from storage
+    for item in resources.async_items():
+        if item["url"].partition("?")[0] == base_url:
+            if item["url"] != url:
+                await resources.async_update_item(item["id"], {"url": url})
+            return
+    await resources.async_create_item({"res_type": "module", "url": url})
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

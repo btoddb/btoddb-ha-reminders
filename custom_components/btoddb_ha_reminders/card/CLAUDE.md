@@ -26,9 +26,9 @@ It is built from **stock HA web components** (`ha-card`, `ha-icon`, `ha-icon-but
 - Build + deploy with `scripts/deploy.sh` from the repo root: it `npm install`s, bumps
   the patch version in `package.json` (and syncs the banner), runs `npm run build`
   (esbuild → `btoddb-ha-reminders.js` + `.map`), and copies the bundle into `../www/`.
-- The integration serves `../www/` at `/btoddb-ha-reminders/` and auto-registers the
-  module (`add_extra_js_url`), so after a deploy just **hard-refresh** the browser —
-  no Lovelace resource to add, no HA restart.
+- The integration serves `../www/` at `/btoddb-ha-reminders/` and auto-registers it
+  as a Lovelace **resource** (content-hash-busted URL), so after a deploy just
+  **hard-refresh** the browser — no manual resource to add, no HA restart.
 
 ## Versioning
 
