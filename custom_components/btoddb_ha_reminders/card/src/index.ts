@@ -24,7 +24,7 @@ window.customCards.push({
   name: "BToddB Reminders",
   description: "Create reminders and see the upcoming ones.",
   preview: false,
-  documentationURL: "https://github.com/btoddb/ha-reminders",
+  documentationURL: "https://github.com/btoddb/btoddb-ha-reminders",
 });
 
 declare global {
