@@ -1,6 +1,6 @@
 {
   "name": "btoddb-ha-reminders-card",
-  "version": "0.0.13",
+  "version": "0.0.14",
   "private": true,
   "description": "Lovelace card for the btoddb-ha-reminders Home Assistant integration.",
   "type": "module",
