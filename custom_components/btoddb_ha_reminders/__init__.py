@@ -41,13 +41,18 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_NOTIFY_SERVICE,
-    DEFAULT_NOTIFY_SERVICE,
     DELIVERY_INTERVAL_MINUTES,
     DOMAIN,
     NOTIFY_DATA,
     NOTIFY_TITLE,
 )
-from .delivery import CATCHUP_FLOOR, ReminderEvent, due_events, effective_watermark
+from .delivery import (
+    CATCHUP_FLOOR,
+    ReminderEvent,
+    due_events,
+    effective_watermark,
+    resolve_notify_target,
+)
 from .spoken_time import format_spoken_time
 from .store import ReminderStore
 
@@ -287,10 +292,9 @@ class ReminderDelivery:
         configured = (
             self._entry.options.get(CONF_NOTIFY_SERVICE)
             or self._entry.data.get(CONF_NOTIFY_SERVICE)
-            or DEFAULT_NOTIFY_SERVICE
+            or ""
         )
-        domain, _, service = configured.partition(".")
-        return (domain or "notify"), (service or "notify")
+        return resolve_notify_target(configured)
 
     async def async_tick(self, _now: datetime | None = None) -> None:
         """One delivery pass over the ``(watermark, now]`` window (RM-6/RM-7)."""
