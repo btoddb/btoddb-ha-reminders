@@ -21,10 +21,29 @@ from homeassistant.config_entries import (
 from homeassistant.core import callback
 from homeassistant.helpers import selector
 
-from .const import CONF_NOTIFY_SERVICE, DEFAULT_NOTIFY_SERVICE, DOMAIN
+from .const import (
+    CONF_CALENDAR_NAME,
+    CONF_NOTIFY_SERVICE,
+    DEFAULT_CALENDAR_NAME,
+    DEFAULT_NOTIFY_SERVICE,
+    DOMAIN,
+)
 
 
-def _schema(default_notify: str) -> vol.Schema:
+def _user_schema(default_name: str, default_notify: str) -> vol.Schema:
+    return vol.Schema(
+        {
+            vol.Required(
+                CONF_CALENDAR_NAME, default=default_name
+            ): selector.TextSelector(),
+            vol.Required(
+                CONF_NOTIFY_SERVICE, default=default_notify
+            ): selector.TextSelector(),
+        }
+    )
+
+
+def _options_schema(default_notify: str) -> vol.Schema:
     return vol.Schema(
         {
             vol.Required(
@@ -42,13 +61,15 @@ class RemindersConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Handle the (only) setup step: pick the notify target."""
+        """Handle the (only) setup step: pick the calendar name and notify target."""
         if self._async_current_entries():
             return self.async_abort(reason="single_instance_allowed")
         if user_input is not None:
-            return self.async_create_entry(title="BToddB Reminders", data=user_input)
+            title = user_input[CONF_CALENDAR_NAME]
+            return self.async_create_entry(title=title, data=user_input)
         return self.async_show_form(
-            step_id="user", data_schema=_schema(DEFAULT_NOTIFY_SERVICE)
+            step_id="user",
+            data_schema=_user_schema(DEFAULT_CALENDAR_NAME, DEFAULT_NOTIFY_SERVICE),
         )
 
     @staticmethod
@@ -70,4 +91,6 @@ class RemindersOptionsFlow(OptionsFlow):
         current = self.config_entry.options.get(
             CONF_NOTIFY_SERVICE
         ) or self.config_entry.data.get(CONF_NOTIFY_SERVICE, DEFAULT_NOTIFY_SERVICE)
-        return self.async_show_form(step_id="init", data_schema=_schema(current))
+        return self.async_show_form(
+            step_id="init", data_schema=_options_schema(current)
+        )

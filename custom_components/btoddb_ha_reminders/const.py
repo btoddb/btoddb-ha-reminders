@@ -6,6 +6,7 @@ DOMAIN = "btoddb_ha_reminders"
 
 # Config / option keys.
 CONF_NOTIFY_SERVICE = "notify_service"
+CONF_CALENDAR_NAME = "calendar_name"
 # Reserved for a future option (pick an existing calendar vs. component-created).
 # v1 is fixed to "internal" — see store.py, which is the swap seam.
 CONF_CALENDAR_SOURCE = "calendar_source"
@@ -13,6 +14,7 @@ CONF_CALENDAR_SOURCE = "calendar_source"
 # Defaults. The default notify target is intentionally generic so the component is
 # shareable; this HA configures it to notify.btoddb (see README + migration).
 DEFAULT_NOTIFY_SERVICE = "notify.notify"
+DEFAULT_CALENDAR_NAME = "BToddB Reminders"
 CALENDAR_SOURCE_INTERNAL = "internal"
 
 # Notification presentation (RM-6): high-priority push so Android delivers immediately
@@ -31,8 +33,3 @@ STORAGE_VERSION = 1
 
 # Delivery loop cadence (RM-6): poll every minute, not the calendar trigger.
 DELIVERY_INTERVAL_MINUTES = 1
-
-# The calendar entity is named "BToddB Reminders" so its entity_id resolves to
-# calendar.btoddb_reminders, keeping the existing dashboard calendar card (RM-8)
-# working.
-CALENDAR_ENTITY_NAME = "BToddB Reminders"
