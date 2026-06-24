@@ -375,7 +375,9 @@ export class BtoddbRemindersCard extends LitElement {
   `;
 }
 
-customElements.define("btoddb-reminders-card", BtoddbRemindersCard);
+if (!customElements.get("btoddb-reminders-card")) {
+  customElements.define("btoddb-reminders-card", BtoddbRemindersCard);
+}
 
 declare global {
   interface HTMLElementTagNameMap {
