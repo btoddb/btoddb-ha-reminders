@@ -3,8 +3,8 @@
 > Copy this file into `proposals/` (e.g. `proposals/fan-curve-tuning.md`) to start.
 > Delete the guidance lines once filled in.
 
-**Status:** proposed | in progress | shipped
-**Touches:** climate-control | profiles | card-ux  *(which spec area this lands in)*
+**Status:** in progress | proposed | shipped
+**Touches:** time-based | location-based | card-ux  *(which spec area this lands in)*
 
 ## Goal
 
