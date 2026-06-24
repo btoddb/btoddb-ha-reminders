@@ -67,9 +67,7 @@ class RemindersConfigFlow(ConfigFlow, domain=DOMAIN):
             return self.async_create_entry(title="BToddB Reminders", data=user_input)
         # Pass "" so the picker starts with no pre-selection; notify.notify would only
         # appear as a phantom option if it isn't actually registered.
-        return self.async_show_form(
-            step_id="user", data_schema=_schema(self.hass, "")
-        )
+        return self.async_show_form(step_id="user", data_schema=_schema(self.hass, ""))
 
     @staticmethod
     @callback

@@ -71,11 +71,7 @@ class _FakeEntry:
 
 
 def _resolve_service(entry: _FakeEntry) -> tuple[str, str]:
-    configured = (
-        entry.options.get(_CONF)
-        or entry.data.get(_CONF)
-        or ""
-    )
+    configured = entry.options.get(_CONF) or entry.data.get(_CONF) or ""
     domain, _, service = configured.partition(".")
     return (domain or "notify"), (service or "notify")
 
