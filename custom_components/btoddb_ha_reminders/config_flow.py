@@ -32,9 +32,9 @@ def _notify_services(hass: HomeAssistant) -> list[str]:
 
 
 def _schema(hass: HomeAssistant, default_notify: str) -> vol.Schema:
-    # Build the dropdown from the live notify services. ``custom_value`` keeps the
-    # configured default selectable even when it isn't currently registered (e.g. a
-    # fresh install whose default service hasn't loaded yet).
+    # Build the dropdown from the live notify services. The current value is prepended
+    # if it isn't in the list (e.g. a fresh install whose default service hasn't loaded
+    # yet), so the picker never resets an already-configured entry.
     options = _notify_services(hass)
     if default_notify and default_notify not in options:
         options = [default_notify, *options]
@@ -46,7 +46,6 @@ def _schema(hass: HomeAssistant, default_notify: str) -> vol.Schema:
                 selector.SelectSelectorConfig(
                     options=options,
                     mode=selector.SelectSelectorMode.DROPDOWN,
-                    custom_value=True,
                 )
             )
         }

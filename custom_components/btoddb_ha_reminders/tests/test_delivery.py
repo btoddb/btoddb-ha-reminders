@@ -56,13 +56,12 @@ def test_nothing_due_returns_empty():
 
 
 # ---------------------------------------------------------------------------
-# _notify_entity() round-trip: mirrors ReminderDelivery._notify_entity()
+# _notify_target() round-trip: mirrors ReminderDelivery._notify_target()
 # (ReminderDelivery lives in __init__.py which has HA imports not loadable
-# here, so we test the identical selection logic using the same constants.)
+# here, so we test the identical resolution+parse logic using the same constants.)
 # ---------------------------------------------------------------------------
 
 _CONF = const.CONF_NOTIFY_SERVICE
-_DEFAULT = const.DEFAULT_NOTIFY_SERVICE
 
 
 class _FakeEntry:
@@ -71,21 +70,28 @@ class _FakeEntry:
         self.data = data or {}
 
 
-def _resolve_entity(entry: _FakeEntry) -> str:
-    return entry.options.get(_CONF) or entry.data.get(_CONF) or _DEFAULT
-
-
-def test_notify_entity_prefers_options_over_data():
-    e = _FakeEntry(
-        options={_CONF: "notify.opt_entity"}, data={_CONF: "notify.data_entity"}
+def _resolve_service(entry: _FakeEntry) -> tuple[str, str]:
+    configured = (
+        entry.options.get(_CONF)
+        or entry.data.get(_CONF)
+        or ""
     )
-    assert _resolve_entity(e) == "notify.opt_entity"
+    domain, _, service = configured.partition(".")
+    return (domain or "notify"), (service or "notify")
 
 
-def test_notify_entity_falls_back_to_data_when_no_options():
-    e = _FakeEntry(data={_CONF: "notify.data_entity"})
-    assert _resolve_entity(e) == "notify.data_entity"
+def test_notify_service_prefers_options_over_data():
+    e = _FakeEntry(
+        options={_CONF: "notify.mobile_app_pixel"}, data={_CONF: "notify.data_svc"}
+    )
+    assert _resolve_service(e) == ("notify", "mobile_app_pixel")
 
 
-def test_notify_entity_falls_back_to_default_when_both_empty():
-    assert _resolve_entity(_FakeEntry()) == _DEFAULT
+def test_notify_service_falls_back_to_data_when_no_options():
+    e = _FakeEntry(data={_CONF: "notify.mobile_app_x"})
+    assert _resolve_service(e) == ("notify", "mobile_app_x")
+
+
+def test_notify_service_partition_parses_domain_and_name():
+    e = _FakeEntry(options={_CONF: "notify.persistent_notification"})
+    assert _resolve_service(e) == ("notify", "persistent_notification")

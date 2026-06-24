@@ -41,7 +41,6 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_NOTIFY_SERVICE,
-    DEFAULT_NOTIFY_SERVICE,
     DELIVERY_INTERVAL_MINUTES,
     DOMAIN,
     NOTIFY_DATA,
@@ -287,7 +286,7 @@ class ReminderDelivery:
         configured = (
             self._entry.options.get(CONF_NOTIFY_SERVICE)
             or self._entry.data.get(CONF_NOTIFY_SERVICE)
-            or DEFAULT_NOTIFY_SERVICE
+            or ""
         )
         domain, _, service = configured.partition(".")
         return (domain or "notify"), (service or "notify")
