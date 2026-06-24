@@ -70,6 +70,76 @@ function defaultWhen(): string {
   return toLocalInput(d);
 }
 
+export class BtoddbRemindersCardEditor extends LitElement {
+  static properties = {
+    hass: { attribute: false },
+    _config: { state: true },
+  };
+
+  hass!: Hass;
+  private _config: CardConfig = { type: "" };
+
+  setConfig(config: CardConfig): void {
+    this._config = config;
+  }
+
+  private _titleChanged(ev: Event): void {
+    const value = (ev.target as HTMLInputElement).value;
+    this._fireConfigChanged({ ...this._config, title: value });
+  }
+
+  private _entityChanged(ev: CustomEvent): void {
+    const value = ev.detail.value as string;
+    this._fireConfigChanged({ ...this._config, entity: value });
+  }
+
+  private _fireConfigChanged(config: CardConfig): void {
+    this._config = config;
+    this.dispatchEvent(
+      new CustomEvent("config-changed", {
+        detail: { config },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  render() {
+    if (!this.hass || !this._config) return html``;
+    return html`
+      <div class="card-config">
+        <ha-textfield
+          .label=${"Title (optional)"}
+          .value=${this._config.title ?? ""}
+          @change=${this._titleChanged}
+        ></ha-textfield>
+        <ha-entity-picker
+          .hass=${this.hass}
+          .value=${this._config.entity ?? ""}
+          .label=${"Calendar entity"}
+          .includeDomains=${["calendar"]}
+          @value-changed=${this._entityChanged}
+        ></ha-entity-picker>
+      </div>
+    `;
+  }
+
+  static styles = css`
+    .card-config {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding: 16px;
+    }
+    ha-textfield,
+    ha-entity-picker {
+      width: 100%;
+    }
+  `;
+}
+
+customElements.define("btoddb-reminders-card-editor", BtoddbRemindersCardEditor);
+
 export class BtoddbRemindersCard extends LitElement {
   static properties = {
     hass: { attribute: false },
@@ -92,6 +162,14 @@ export class BtoddbRemindersCard extends LitElement {
   private _entity = DEFAULT_ENTITY;
   private _lastSignature = "";
   private _refreshTimer?: number;
+
+  static getConfigElement() {
+    return document.createElement("btoddb-reminders-card-editor");
+  }
+
+  static getStubConfig() {
+    return { entity: DEFAULT_ENTITY };
+  }
 
   setConfig(config: CardConfig): void {
     this._config = config ?? { type: "" };
@@ -380,5 +458,6 @@ customElements.define("btoddb-reminders-card", BtoddbRemindersCard);
 declare global {
   interface HTMLElementTagNameMap {
     "btoddb-reminders-card": BtoddbRemindersCard;
+    "btoddb-reminders-card-editor": BtoddbRemindersCardEditor;
   }
 }
