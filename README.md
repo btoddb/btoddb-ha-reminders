@@ -66,8 +66,9 @@ To see what's available on your instance, open **Developer Tools → Actions** a
 
 > **Note:** the picker lists notify *services*, not the newer notify *entities*. This is
 > deliberate — persistent notifications and notify groups are only exposed as services,
-> never as entities, so a service picker is the only way to reach them. The field also
-> accepts a typed-in value if the service you want isn't registered yet.
+> never as entities, so a service picker is the only way to reach them. Make sure the
+> integration whose service you want is installed and connected before opening Configure —
+> the dropdown only shows services that are already registered.
 
 ## Wiring up the conversation agent
 

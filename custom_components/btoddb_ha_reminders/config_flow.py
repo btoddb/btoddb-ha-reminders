@@ -33,8 +33,8 @@ def _notify_services(hass: HomeAssistant) -> list[str]:
 
 def _schema(hass: HomeAssistant, default_notify: str) -> vol.Schema:
     # Build the dropdown from the live notify services. The current value is prepended
-    # if it isn't in the list (e.g. a fresh install whose default service hasn't loaded
-    # yet), so the picker never resets an already-configured entry.
+    # if it isn't in the list (e.g. an already-configured service that is temporarily
+    # offline), so the options flow never silently resets an existing entry.
     options = _notify_services(hass)
     if default_notify and default_notify not in options:
         options = [default_notify, *options]
@@ -65,8 +65,10 @@ class RemindersConfigFlow(ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason="single_instance_allowed")
         if user_input is not None:
             return self.async_create_entry(title="BToddB Reminders", data=user_input)
+        # Pass "" so the picker starts with no pre-selection; notify.notify would only
+        # appear as a phantom option if it isn't actually registered.
         return self.async_show_form(
-            step_id="user", data_schema=_schema(self.hass, DEFAULT_NOTIFY_SERVICE)
+            step_id="user", data_schema=_schema(self.hass, "")
         )
 
     @staticmethod
