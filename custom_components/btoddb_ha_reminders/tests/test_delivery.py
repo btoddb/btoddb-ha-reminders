@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 from conftest import load_module
 
 delivery = load_module("delivery")
+const = load_module("const")
 ReminderEvent = delivery.ReminderEvent
 due_events = delivery.due_events
 effective_watermark = delivery.effective_watermark
@@ -52,3 +53,43 @@ def test_nothing_due_returns_empty():
     watermark = NOW - timedelta(minutes=2)
     events = [_ev("future", 10)]
     assert due_events(events, watermark, NOW) == []
+
+
+# ---------------------------------------------------------------------------
+# _notify_entity() round-trip: mirrors ReminderDelivery._notify_entity()
+# (ReminderDelivery lives in __init__.py which has HA imports not loadable
+# here, so we test the identical selection logic using the same constants.)
+# ---------------------------------------------------------------------------
+
+_CONF = const.CONF_NOTIFY_SERVICE
+_DEFAULT = const.DEFAULT_NOTIFY_SERVICE
+
+
+class _FakeEntry:
+    def __init__(self, options=None, data=None):
+        self.options = options or {}
+        self.data = data or {}
+
+
+def _resolve_entity(entry: _FakeEntry) -> str:
+    return (
+        entry.options.get(_CONF)
+        or entry.data.get(_CONF)
+        or _DEFAULT
+    )
+
+
+def test_notify_entity_prefers_options_over_data():
+    e = _FakeEntry(
+        options={_CONF: "notify.opt_entity"}, data={_CONF: "notify.data_entity"}
+    )
+    assert _resolve_entity(e) == "notify.opt_entity"
+
+
+def test_notify_entity_falls_back_to_data_when_no_options():
+    e = _FakeEntry(data={_CONF: "notify.data_entity"})
+    assert _resolve_entity(e) == "notify.data_entity"
+
+
+def test_notify_entity_falls_back_to_default_when_both_empty():
+    assert _resolve_entity(_FakeEntry()) == _DEFAULT

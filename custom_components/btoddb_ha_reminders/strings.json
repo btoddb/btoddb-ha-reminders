@@ -3,12 +3,12 @@
     "step": {
       "user": {
         "title": "BToddB Reminders",
-        "description": "BToddB Reminders are delivered as a high-priority push to a notify service.",
+        "description": "BToddB Reminders are delivered as a push notification to a notify entity.",
         "data": {
-          "notify_service": "Notify service"
+          "notify_service": "Notify entity"
         },
         "data_description": {
-          "notify_service": "Select the notification service to push due reminders to."
+          "notify_service": "Select the notify entity to push due reminders to. See the README Configure section for how to set one up."
         }
       }
     },
@@ -21,10 +21,10 @@
       "init": {
         "title": "BToddB Reminders",
         "data": {
-          "notify_service": "Notify service"
+          "notify_service": "Notify entity"
         },
         "data_description": {
-          "notify_service": "Select the notification service to push due reminders to."
+          "notify_service": "Select the notify entity to push due reminders to. See the README Configure section for how to set one up."
         }
       }
     }

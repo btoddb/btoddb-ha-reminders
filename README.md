@@ -40,9 +40,30 @@ and restart.
 
 ### Configure
 
-**Settings → Devices & Services → Add Integration → Reminders.** Set the **notify
-service** the delivery loop should push to (e.g. `notify.btoddb` or a notify group). You
-can change it later from the integration's **Configure** button.
+**Settings → Devices & Services → Add Integration → Reminders.** The setup picker
+shows all **notify entities** registered in your HA instance — select the one you
+want due reminders delivered to. You can change it later from the integration's
+**Configure** button.
+
+#### What is a notify entity?
+
+Modern Home Assistant integrations register a *notify entity* (domain `notify`) rather
+than a legacy notify service. The most common source is the **Home Assistant Companion
+App** for Android or iOS: once the app is installed and your phone has connected to HA,
+a `notify.mobile_app_<device>` entity appears automatically.
+
+To verify your notify entity exists:
+
+1. **Settings → Devices & Services → Entities** and filter by domain `notify`, or
+2. Open **Developer Tools → States** and look for entities starting with `notify.`.
+
+If the picker is empty, the Companion App is not yet connected. Install it from the
+[App Store](https://apps.apple.com/app/home-assistant/id1099568401) or
+[Google Play](https://play.google.com/store/apps/details?id=io.homeassistant.companion.android),
+sign in to your HA instance, and the entity will appear within seconds.
+
+Other integrations that register notify entities include pushover, ntfy, and any
+integration that uses HA's modern `NotifyEntity` base class.
 
 ## Wiring up the conversation agent
 

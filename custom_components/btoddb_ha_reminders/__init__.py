@@ -44,7 +44,6 @@ from .const import (
     DEFAULT_NOTIFY_SERVICE,
     DELIVERY_INTERVAL_MINUTES,
     DOMAIN,
-    NOTIFY_DATA,
     NOTIFY_TITLE,
 )
 from .delivery import CATCHUP_FLOOR, ReminderEvent, due_events, effective_watermark
@@ -283,30 +282,28 @@ class ReminderDelivery:
         self._entry = entry
         self._store = store
 
-    def _notify_target(self) -> tuple[str, str]:
-        configured = (
+    def _notify_entity(self) -> str:
+        return (
             self._entry.options.get(CONF_NOTIFY_SERVICE)
             or self._entry.data.get(CONF_NOTIFY_SERVICE)
             or DEFAULT_NOTIFY_SERVICE
         )
-        domain, _, service = configured.partition(".")
-        return (domain or "notify"), (service or "notify")
 
     async def async_tick(self, _now: datetime | None = None) -> None:
         """One delivery pass over the ``(watermark, now]`` window (RM-6/RM-7)."""
         now = dt_util.now()
         watermark = effective_watermark(self._store.watermark, now)
-        domain, service = self._notify_target()
+        entity_id = self._notify_entity()
 
         for event in due_events(self._store.events, watermark, now):
             try:
                 await self._hass.services.async_call(
-                    domain,
-                    service,
+                    "notify",
+                    "send_message",
                     {
-                        "title": NOTIFY_TITLE,
+                        "entity_id": entity_id,
                         "message": event.summary,
-                        "data": dict(NOTIFY_DATA),
+                        "title": NOTIFY_TITLE,
                     },
                     blocking=True,
                 )
