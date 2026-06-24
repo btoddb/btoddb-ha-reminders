@@ -118,12 +118,13 @@ If you leave a comment on the PR, and it is more than just a comment, tag each c
 - **Lint:** `scripts/lint` (ruff). It **rewrites files** (`ruff format` +
   `ruff check --fix`) — it is not a check-only command, so expect working-tree
   changes after it runs.
-- **Engine unit tests (no HA needed):** run from inside the tests directory so
-  `conftest.py`'s `load_module` shim is importable (`--import-mode=importlib`
-  doesn't add it to `sys.path` otherwise):
-  `cd custom_components/btoddb_ha_reminders/tests && python3 -m pytest`
-- **Validate manifest/HACS:** `python3 -m script.hassfest` and the
-  `.github/workflows/validate.yml` workflow.
+- **Engine unit tests (no HA needed):** `python3 -m pytest` (runs from repo root;
+  `testpaths` in `pytest.ini` points at the tests directory automatically)
+- **Validate manifest/HACS:** hassfest runs in CI via `.github/workflows/validate.yml`
+  (not locally available). Before committing any changes to `strings.json` or
+  `translations/en.json`, manually verify: **translation strings must not contain
+  HTML** — angle-bracket syntax like `<device>` is rejected; use plain text such as
+  `DEVICE` instead.
 - **Build the card:** `scripts/deploy.sh` builds, bumps the version, and copies
   into `www/`. Edit the TypeScript source at
   `custom_components/btoddb_ha_reminders/card/src/*.ts` — never hand-edit the

@@ -46,3 +46,9 @@ def due_events(
 ) -> list[ReminderEvent]:
     """Return events whose start falls in the half-open window ``(watermark, now]``."""
     return [e for e in events if watermark < e.start <= now]
+
+
+def resolve_notify_target(configured: str) -> tuple[str, str]:
+    """Parse ``domain.service`` into ``(domain, service)``."""
+    domain, _, service = configured.partition(".")
+    return (domain or "notify"), (service or "notify")

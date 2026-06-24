@@ -7,7 +7,8 @@
   "config_flow": true,
   "dependencies": [
     "frontend",
-    "http"
+    "http",
+    "lovelace"
   ],
   "documentation": "https://github.com/btoddb/btoddb-ha-reminders",
   "integration_type": "service",
@@ -18,5 +19,5 @@
   ],
   "requirements": [],
   "single_config_entry": true,
-  "version": "v0.1.0"
+  "version": "v0.1.1"
 }

@@ -11,6 +11,12 @@ from __future__ import annotations
 import importlib.util
 import sys
 from pathlib import Path
+
+# With --import-mode=importlib, pytest doesn't add the conftest directory to
+# sys.path, so "from conftest import load_module" in test files fails unless
+# we're cd'd into the tests dir. Insert it explicitly so pytest can be run
+# from the repo root.
+sys.path.insert(0, str(Path(__file__).parent))
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
