@@ -31,14 +31,17 @@ npm install
 #        two touched files and roll them back if the build/deploy fails, so a broken
 #        build never leaves a bumped-but-unbuilt (dirty, inconsistent) tree. ---
 PKG_BACKUP="$(mktemp)"
+LOCK_BACKUP="$(mktemp)"
 IDX_BACKUP="$(mktemp)"
 cp package.json "$PKG_BACKUP"
+cp package-lock.json "$LOCK_BACKUP"
 cp src/index.ts "$IDX_BACKUP"
 rollback() {
     echo "ERROR: build/deploy failed — rolling back the version bump." >&2
     cp "$PKG_BACKUP" package.json
+    cp "$LOCK_BACKUP" package-lock.json
     cp "$IDX_BACKUP" src/index.ts
-    rm -f "$PKG_BACKUP" "$IDX_BACKUP"
+    rm -f "$PKG_BACKUP" "$LOCK_BACKUP" "$IDX_BACKUP"
 }
 trap rollback ERR
 
@@ -56,6 +59,12 @@ open("src/index.ts", "w").write(src)
 PYEOF
 echo "Version: $OLD_VERSION -> $NEW_VERSION"
 
+# Sync package-lock.json's version to the bump. npm only rewrites the lock when
+# it runs, and step 1's install happened before the bump, so without this the
+# lock stays one version behind. Deps are already installed, so this only
+# refreshes the lock's version fields (no network, no node_modules changes).
+npm install --package-lock-only
+
 # --- 3. Build. ---
 echo "Building..."
 npm run build
@@ -67,6 +76,6 @@ cp btoddb-ha-reminders.js btoddb-ha-reminders.js.map "$COMPONENT_WWW/"
 
 # Success: drop the rollback trap and discard the backups.
 trap - ERR
-rm -f "$PKG_BACKUP" "$IDX_BACKUP"
+rm -f "$PKG_BACKUP" "$LOCK_BACKUP" "$IDX_BACKUP"
 
 echo "Done (v$NEW_VERSION). Hard-refresh your browser (Ctrl+Shift+R) to load the new card."
