@@ -65,11 +65,9 @@ def _expand_recurring(
     step = _rrule_step(event.rrule)
     if step is None:
         return []
-    # Walk back from the stored anchor until we're at or before range_start,
-    # then forward to land on the first occurrence within the range.
+    # Start from the stored anchor (always the next future occurrence — roll-forward
+    # model). Never walk backward: occurrences before event.start have already fired.
     anchor = event.start
-    while anchor > range_start:
-        anchor -= step
     while anchor < range_start:
         anchor += step
     results: list[CalendarEvent] = []

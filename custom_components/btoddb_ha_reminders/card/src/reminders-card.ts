@@ -320,6 +320,7 @@ export class BtoddbRemindersCard extends LitElement {
         `&end=${encodeURIComponent(end.toISOString())}`,
       );
       const cutoff = Date.now() - 60_000;
+      const seenUids = new Set<string>();
       this._items = (events ?? [])
         .map(
           (e): TimeItem => ({
@@ -333,7 +334,16 @@ export class BtoddbRemindersCard extends LitElement {
           }),
         )
         .filter((i) => i.start.getTime() >= cutoff || i.rrule !== "")
-        .sort((a, b) => a.start.getTime() - b.start.getTime());
+        .sort((a, b) => a.start.getTime() - b.start.getTime())
+        .filter((i) => {
+          // For recurring series the calendar API returns one entry per occurrence;
+          // keep only the earliest (already sorted above) so the card shows one row
+          // per series rather than 52/365 identical rows.
+          if (!i.rrule) return true;
+          if (seenUids.has(i.uid)) return false;
+          seenUids.add(i.uid);
+          return true;
+        });
       this._error = "";
     } catch (err) {
       this._error = `Could not load reminders: ${this._msg(err)}`;
