@@ -64,6 +64,7 @@ from .delivery import (
     due_events,
     effective_watermark,
     resolve_notify_target,
+    validate_rrule,
 )
 from .location import LocationReminder, transition_kind, triggered
 from .location_store import LocationReminderStore
@@ -409,6 +410,10 @@ def _async_register_service(hass: HomeAssistant, store: ReminderStore) -> None:
             )
             raise ServiceValidationError(msg)
         rrule: str | None = call.data.get(ATTR_RRULE) or None
+        if rrule is not None:
+            err = validate_rrule(rrule, start)
+            if err is not None:
+                raise ServiceValidationError(err)
         event = ReminderEvent(
             uid=uuid.uuid4().hex, summary=message, start=start, rrule=rrule
         )
@@ -542,9 +547,26 @@ class ReminderDelivery:
             await async_send_notification(
                 self._hass, domain, service, NOTIFY_TITLE, event.summary
             )
-            next_event = advance_recurring(event)
+            next_event = advance_recurring(event, now)
             if next_event is not None:
                 await self._store.async_replace_event(event.uid, next_event)
+
+        # Self-heal recurring events whose start slipped behind the 6h watermark
+        # floor (e.g. after a long HA outage). These events are not in due_events
+        # (missed the window) and would be silently pruned if left in the past —
+        # advance them to the next future occurrence so they keep firing.
+        for event in list(self._store.events):
+            if event.rrule is not None and event.start <= watermark:
+                next_event = advance_recurring(event, now)
+                if next_event is not None:
+                    await self._store.async_replace_event(event.uid, next_event)
+                    _LOGGER.warning(
+                        "Recurring reminder %r missed its scheduled time (%s); "
+                        "advanced to next occurrence at %s",
+                        event.summary,
+                        event.start.isoformat(),
+                        next_event.start.isoformat(),
+                    )
 
         await self._store.async_set_watermark(now)
         await self._store.async_prune(now - PRUNE_RETENTION)
