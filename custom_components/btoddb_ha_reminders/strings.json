@@ -47,6 +47,36 @@
         "in_minutes": {
           "name": "In minutes",
           "description": "Minutes from now, for relative delays. Takes priority over when when both are given."
+        },
+        "rrule": {
+          "name": "Recurrence rule",
+          "description": "RRULE string for recurring reminders (FREQ=DAILY or FREQ=WEEKLY;BYDAY=MO). After each delivery the next occurrence is scheduled automatically."
+        }
+      }
+    },
+    "update": {
+      "name": "Update reminder",
+      "description": "Edit an existing time-based reminder by uid.",
+      "fields": {
+        "uid": {
+          "name": "UID",
+          "description": "The unique id of the reminder to update."
+        },
+        "message": {
+          "name": "Message",
+          "description": "Replacement reminder text. Omit to leave unchanged."
+        },
+        "when": {
+          "name": "When",
+          "description": "New absolute ISO 8601 local datetime. Omit to leave unchanged."
+        },
+        "in_minutes": {
+          "name": "In minutes",
+          "description": "New relative delay in minutes from now. Omit to leave unchanged."
+        },
+        "rrule": {
+          "name": "Recurrence rule",
+          "description": "New RRULE (FREQ=DAILY, FREQ=WEEKLY;BYDAY=MO, etc.). Pass empty or null to clear. Omit to leave unchanged."
         }
       }
     },

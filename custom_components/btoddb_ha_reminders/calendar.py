@@ -8,6 +8,7 @@ changes (a reminder is created or pruned).
 
 from __future__ import annotations
 
+import dataclasses
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
@@ -42,12 +43,51 @@ async def async_setup_entry(
     async_add_entities([ReminderCalendarEntity(store, entry)])
 
 
+def _rrule_step(rrule: str) -> timedelta | None:
+    """Return the recurrence step for a supported RRULE string, or None."""
+    for token in rrule.upper().split(";"):
+        if token.startswith("FREQ="):
+            freq = token[5:]
+            if freq == "DAILY":
+                return timedelta(days=1)
+            if freq == "WEEKLY":
+                return timedelta(weeks=1)
+            return None
+    return None
+
+
+def _expand_recurring(
+    event: ReminderEvent, range_start: datetime, range_end: datetime
+) -> list[CalendarEvent]:
+    """Return CalendarEvents for every occurrence of a recurring event in the range."""
+    if event.rrule is None:
+        return []
+    step = _rrule_step(event.rrule)
+    if step is None:
+        return []
+    # Start from the stored anchor (always the next future occurrence — roll-forward
+    # model). Never walk backward: occurrences before event.start have already fired.
+    anchor = event.start
+    while anchor < range_start:
+        anchor += step
+    results: list[CalendarEvent] = []
+    current = anchor
+    while current <= range_end:
+        results.append(_to_calendar_event(dataclasses.replace(event, start=current)))
+        current += step
+    return results
+
+
 def _to_calendar_event(event: ReminderEvent) -> CalendarEvent:
     return CalendarEvent(
         summary=event.summary,
         start=event.start,
         end=event.start + EVENT_DURATION,
         uid=event.uid,
+        # Pass rrule as description so the card can read it without risking
+        # HA expanding the event into multiple occurrences (the roll-forward
+        # model keeps exactly one occurrence in the store at any time).
+        description=event.rrule or None,
     )
 
 
@@ -83,10 +123,15 @@ class ReminderCalendarEntity(CalendarEntity):
     async def async_get_events(
         self, _hass: HomeAssistant, start_date: datetime, end_date: datetime
     ) -> list[CalendarEvent]:
-        """Return reminders within the requested window."""
-        return [
-            _to_calendar_event(e) for e in self._store.in_range(start_date, end_date)
-        ]
+        """Return reminders within the requested window, expanding recurring events."""
+        results: list[CalendarEvent] = []
+        for e in self._store.events:
+            if e.rrule is None:
+                if start_date <= e.start <= end_date:
+                    results.append(_to_calendar_event(e))
+            else:
+                results.extend(_expand_recurring(e, start_date, end_date))
+        return results
 
     async def async_delete_event(
         self,

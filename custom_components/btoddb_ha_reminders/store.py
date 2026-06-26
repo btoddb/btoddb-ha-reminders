@@ -29,6 +29,9 @@ if TYPE_CHECKING:
 
     from homeassistant.core import HomeAssistant
 
+# Sentinel for "caller did not supply rrule" vs "caller wants to clear it".
+_RRULE_UNSET: object = object()
+
 
 class ReminderStore:
     """In-memory reminder events + watermark, persisted to HA ``.storage``."""
@@ -49,7 +52,12 @@ class ReminderStore:
             if start is None:
                 continue
             events.append(
-                ReminderEvent(uid=raw["uid"], summary=raw["summary"], start=start)
+                ReminderEvent(
+                    uid=raw["uid"],
+                    summary=raw["summary"],
+                    start=start,
+                    rrule=raw.get("rrule"),
+                )
             )
         self.events = events
         raw_wm = data.get("watermark")
@@ -59,7 +67,12 @@ class ReminderStore:
     def _data(self) -> dict:
         return {
             "events": [
-                {"uid": e.uid, "summary": e.summary, "start": e.start.isoformat()}
+                {
+                    "uid": e.uid,
+                    "summary": e.summary,
+                    "start": e.start.isoformat(),
+                    **({"rrule": e.rrule} if e.rrule is not None else {}),
+                }
                 for e in self.events
             ],
             "watermark": self.watermark.isoformat() if self.watermark else None,
@@ -103,20 +116,30 @@ class ReminderStore:
         *,
         summary: str | None = None,
         start: datetime | None = None,
+        rrule: object = _RRULE_UNSET,
+        rrule_changed: bool = False,
     ) -> bool:
-        """Update a reminder by uid and persist. Returns True if found."""
-        if summary is None and start is None:
+        """
+        Update a reminder by uid and persist. Returns True if found.
+
+        Pass ``rrule=<value>`` together with ``rrule_changed=True`` to set or clear the
+        rrule. Omitting ``rrule`` (or leaving ``rrule_changed=False``) leaves the
+        existing value untouched.
+        """
+        if summary is None and start is None and not rrule_changed:
             return any(e.uid == uid for e in self.events)
         found = False
         updated: list[ReminderEvent] = []
         for e in self.events:
             if e.uid == uid:
                 found = True
+                new_rrule = rrule if rrule_changed else e.rrule
                 updated.append(
                     dataclasses.replace(
                         e,
                         summary=summary if summary is not None else e.summary,
                         start=start if start is not None else e.start,
+                        rrule=new_rrule,  # type: ignore[arg-type]
                     )
                 )
             else:
@@ -125,6 +148,11 @@ class ReminderStore:
             self.events = updated
             await self._async_persist()
         return found
+
+    async def async_replace_event(self, uid: str, new_event: ReminderEvent) -> None:
+        """Replace a reminder in-place by uid (e.g. advance a recurring one)."""
+        self.events = [new_event if e.uid == uid else e for e in self.events]
+        await self._async_persist()
 
     async def async_prune(self, before: datetime) -> None:
         """Drop already-delivered events older than ``before`` to bound storage."""

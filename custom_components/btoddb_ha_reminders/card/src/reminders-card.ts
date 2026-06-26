@@ -43,6 +43,7 @@ interface CalendarEvent {
   uid?: string;
   summary: string;
   start: { dateTime?: string; date?: string };
+  description?: string;
 }
 
 interface TimeItem {
@@ -50,6 +51,7 @@ interface TimeItem {
   uid: string;
   summary: string;
   start: Date;
+  rrule: string;
 }
 
 interface LocationItem {
@@ -77,6 +79,39 @@ const DEFAULT_ENTITY = "calendar.btoddb_reminders";
 const LOCATION_SENSOR_DEFAULT = "sensor.btoddb_location_reminders";
 // Attribute the integration stamps on its location sensor for discovery.
 const LOCATION_SENSOR_MARKER = "btoddb_ha_reminders_location";
+
+// Weekday chip order: Sun Mon Tue Wed Thu Fri Sat
+const WEEKDAY_CHIPS: { code: string; label: string }[] = [
+  { code: "SU", label: "S" },
+  { code: "MO", label: "M" },
+  { code: "TU", label: "T" },
+  { code: "WE", label: "W" },
+  { code: "TH", label: "T" },
+  { code: "FR", label: "F" },
+  { code: "SA", label: "S" },
+];
+
+// Full day names for the BYDAY codes.
+const BYDAY_FULL: Record<string, string> = {
+  MO: "Monday",
+  TU: "Tuesday",
+  WE: "Wednesday",
+  TH: "Thursday",
+  FR: "Friday",
+  SA: "Saturday",
+  SU: "Sunday",
+};
+
+// JS getDay() returns 0=Sun,1=Mon,...,6=Sat; map BYDAY code → JS day index.
+const BYDAY_JS_DAY: Record<string, number> = {
+  SU: 0,
+  MO: 1,
+  TU: 2,
+  WE: 3,
+  TH: 4,
+  FR: 5,
+  SA: 6,
+};
 
 const pad = (n: number): string => String(n).padStart(2, "0");
 
@@ -187,6 +222,9 @@ export class BtoddbRemindersCard extends LitElement {
     _mode: { state: true },
     _message: { state: true },
     _when: { state: true },
+    _repeatOpen: { state: true },
+    _freq: { state: true },
+    _weekday: { state: true },
     _locMessage: { state: true },
     _locPerson: { state: true },
     _locZone: { state: true },
@@ -202,6 +240,9 @@ export class BtoddbRemindersCard extends LitElement {
   private _mode: "time" | "location" = "time";
   private _message = "";
   private _when = defaultWhen();
+  private _repeatOpen = false;
+  private _freq: "daily" | "weekly" = "daily";
+  private _weekday = "MO";
   private _locMessage = "";
   private _locPerson = "";
   private _locZone = "";
@@ -279,6 +320,7 @@ export class BtoddbRemindersCard extends LitElement {
         `&end=${encodeURIComponent(end.toISOString())}`,
       );
       const cutoff = Date.now() - 60_000;
+      const seenUids = new Set<string>();
       this._items = (events ?? [])
         .map(
           (e): TimeItem => ({
@@ -286,14 +328,46 @@ export class BtoddbRemindersCard extends LitElement {
             uid: e.uid ?? "",
             summary: e.summary,
             start: new Date(e.start.dateTime ?? e.start.date ?? ""),
+            // The integration sets CalendarEvent.description = rrule so the card
+            // can display the recurrence badge without HA expanding the event.
+            rrule: e.description ?? "",
           }),
         )
-        .filter((i) => i.start.getTime() >= cutoff)
-        .sort((a, b) => a.start.getTime() - b.start.getTime());
+        .filter((i) => i.start.getTime() >= cutoff || i.rrule !== "")
+        .sort((a, b) => a.start.getTime() - b.start.getTime())
+        .filter((i) => {
+          // For recurring series the calendar API returns one entry per occurrence;
+          // keep only the earliest (already sorted above) so the card shows one row
+          // per series rather than 52/365 identical rows.
+          if (!i.rrule) return true;
+          if (seenUids.has(i.uid)) return false;
+          seenUids.add(i.uid);
+          return true;
+        });
       this._error = "";
     } catch (err) {
       this._error = `Could not load reminders: ${this._msg(err)}`;
     }
+  }
+
+  /** Build the RRULE string from current UI state; "" when repeat is off. */
+  private _buildRrule(): string {
+    if (!this._repeatOpen) return "";
+    if (this._freq === "daily") return "FREQ=DAILY";
+    return `FREQ=WEEKLY;BYDAY=${this._weekday}`;
+  }
+
+  /**
+   * Advance `when` (datetime-local string) to the nearest date whose JS day
+   * index matches `byday`.  Keeps the same time-of-day.
+   */
+  private _adjustToWeekday(when: string, byday: string): string {
+    const target = BYDAY_JS_DAY[byday] ?? 1;
+    const d = new Date(when);
+    const current = d.getDay();
+    const diff = (target - current + 7) % 7;
+    d.setDate(d.getDate() + diff);
+    return toLocalInput(d);
   }
 
   private async _add(): Promise<void> {
@@ -307,6 +381,18 @@ export class BtoddbRemindersCard extends LitElement {
       return;
     }
     const editingUid = this._editingUid;
+    const rrule = this._buildRrule();
+    // For weekly recurrence, shift the anchor date to the chosen weekday so the
+    // backend's BYDAY-vs-start validation always passes.
+    let when = this._when;
+    if (rrule && this._freq === "weekly") {
+      when = this._adjustToWeekday(when, this._weekday);
+    }
+    const serviceData: Record<string, unknown> = { message, when };
+    if (rrule) serviceData.rrule = rrule;
+    // When editing and repeat has been turned off, explicitly clear the rrule.
+    if (editingUid && !rrule) serviceData.rrule = null;
+
     this._busy = true;
     this._error = "";
     try {
@@ -314,7 +400,7 @@ export class BtoddbRemindersCard extends LitElement {
         await this.hass.callService(
           "btoddb_ha_reminders",
           "update",
-          { uid: editingUid, message, when: this._when },
+          { uid: editingUid, ...serviceData },
           undefined,
           undefined,
           true,
@@ -325,7 +411,7 @@ export class BtoddbRemindersCard extends LitElement {
         await this.hass.callService(
           "btoddb_ha_reminders",
           "create",
-          { message, when: this._when },
+          serviceData,
           undefined,
           undefined,
           true,
@@ -333,6 +419,9 @@ export class BtoddbRemindersCard extends LitElement {
       }
       this._message = "";
       this._when = defaultWhen();
+      this._repeatOpen = false;
+      this._freq = "daily";
+      this._weekday = "MO";
       await this._fetch();
     } catch (err) {
       this._error = `Could not ${editingUid ? "update" : "create"} reminder: ${this._msg(err)}`;
@@ -406,6 +495,22 @@ export class BtoddbRemindersCard extends LitElement {
     this._mode = "time";
     this._message = item.summary;
     this._when = toLocalInput(item.start);
+    if (item.rrule) {
+      this._repeatOpen = true;
+      const upper = item.rrule.toUpperCase();
+      if (upper.includes("FREQ=WEEKLY")) {
+        this._freq = "weekly";
+        const match = upper.match(/BYDAY=(\w+)/);
+        this._weekday = match ? match[1] : "MO";
+      } else {
+        this._freq = "daily";
+        this._weekday = "MO";
+      }
+    } else {
+      this._repeatOpen = false;
+      this._freq = "daily";
+      this._weekday = "MO";
+    }
     this._error = "";
   }
 
@@ -423,6 +528,9 @@ export class BtoddbRemindersCard extends LitElement {
     this._editingUid = "";
     this._message = "";
     this._when = defaultWhen();
+    this._repeatOpen = false;
+    this._freq = "daily";
+    this._weekday = "MO";
     this._locMessage = "";
     this._locPerson = "";
     this._locZone = "";
@@ -500,36 +608,128 @@ export class BtoddbRemindersCard extends LitElement {
     }
   }
 
+  /** Human-readable recurrence string, e.g. "Every day at 9:45 AM". */
+  private _formatRecurrence(rrule: string, start: Date): string {
+    const time = start.toLocaleString(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+    const upper = rrule.toUpperCase();
+    if (upper.includes("FREQ=DAILY")) return `Every day at ${time}`;
+    if (upper.includes("FREQ=WEEKLY")) {
+      const match = upper.match(/BYDAY=(\w+)/);
+      if (match) {
+        const dayName = BYDAY_FULL[match[1]] ?? match[1];
+        return `Every ${dayName} at ${time}`;
+      }
+      return `Weekly at ${time}`;
+    }
+    return rrule;
+  }
+
+  private _renderRepeatDisclosure() {
+    return html`
+      <div class="repeat-row">
+        <button
+          type="button"
+          class="repeat-toggle"
+          @click=${() => {
+            this._repeatOpen = !this._repeatOpen;
+          }}
+        >
+          <ha-icon
+            icon=${this._repeatOpen ? "mdi:chevron-down" : "mdi:chevron-right"}
+          ></ha-icon>
+          Repeat
+        </button>
+        ${this._repeatOpen
+          ? html`
+              <div class="repeat-body">
+                <select
+                  class="freq-select"
+                  .value=${this._freq}
+                  @change=${(e: Event) => {
+                    this._freq = (e.target as HTMLSelectElement)
+                      .value as "daily" | "weekly";
+                  }}
+                >
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                </select>
+                ${this._freq === "weekly"
+                  ? html`
+                      <div class="weekday-chips">
+                        ${WEEKDAY_CHIPS.map(
+                          ({ code, label }) => html`
+                            <button
+                              type="button"
+                              class="chip ${this._weekday === code
+                                ? "selected"
+                                : ""}"
+                              title=${BYDAY_FULL[code] ?? code}
+                              @click=${() => {
+                                this._weekday = code;
+                              }}
+                            >
+                              ${label}
+                            </button>
+                          `,
+                        )}
+                      </div>
+                    `
+                  : nothing}
+              </div>
+            `
+          : nothing}
+      </div>
+    `;
+  }
+
   private _renderTimeAddRow() {
     const isEditing = !!this._editingUid;
     return html`
-      <div class="add-row">
-        <input
-          class="message"
-          type="text"
-          placeholder="New reminder"
-          .value=${this._message}
-          @input=${(e: Event) => {
-        this._message = (e.target as HTMLInputElement).value;
-      }}
-          @keydown=${(e: KeyboardEvent) => {
-        if (e.key === "Enter") this._add();
-      }}
-        />
-        <input
-          class="when"
-          type="datetime-local"
-          .value=${this._when}
-          @input=${(e: Event) => {
-        this._when = (e.target as HTMLInputElement).value;
-      }}
-        />
-        ${isEditing
-        ? html`<button type="button" class="btn btn-secondary" ?disabled=${this._busy} @click=${() => this._cancelEdit()}>Cancel</button>`
-        : nothing}
-        <button type="button" class="btn btn-primary" ?disabled=${this._busy} @click=${() => this._add()}>
-          ${isEditing ? "Save" : "Add"}
-        </button>
+      <div>
+        <div class="add-row">
+          <input
+            class="message"
+            type="text"
+            placeholder="New reminder"
+            .value=${this._message}
+            @input=${(e: Event) => {
+              this._message = (e.target as HTMLInputElement).value;
+            }}
+            @keydown=${(e: KeyboardEvent) => {
+              if (e.key === "Enter") this._add();
+            }}
+          />
+          <input
+            class="when"
+            type="datetime-local"
+            .value=${this._when}
+            @input=${(e: Event) => {
+              this._when = (e.target as HTMLInputElement).value;
+            }}
+          />
+          ${isEditing
+            ? html`<button
+                type="button"
+                class="btn btn-secondary"
+                ?disabled=${this._busy}
+                @click=${() => this._cancelEdit()}
+              >
+                Cancel
+              </button>`
+            : nothing}
+          <button
+            type="button"
+            class="btn btn-primary"
+            ?disabled=${this._busy}
+            @click=${() => this._add()}
+          >
+            ${isEditing ? "Save" : "Add"}
+          </button>
+        </div>
+        ${this._renderRepeatDisclosure()}
       </div>
     `;
   }
@@ -593,12 +793,19 @@ export class BtoddbRemindersCard extends LitElement {
   }
 
   private _renderTimeItem(item: TimeItem) {
+    const isRecurring = !!item.rrule;
+    const sub = isRecurring
+      ? this._formatRecurrence(item.rrule, item.start)
+      : this._formatTime(item.start);
     return html`
-      <div class="item">
-        <ha-icon class="leading" icon="mdi:alarm"></ha-icon>
+      <div class="item ${isRecurring ? "recurring" : ""}">
+        <ha-icon
+          class="leading"
+          icon=${isRecurring ? "mdi:repeat" : "mdi:alarm"}
+        ></ha-icon>
         <div class="text">
           <span class="summary">${item.summary}</span>
-          <span class="time">${this._formatTime(item.start)}</span>
+          <span class="time">${sub}</span>
         </div>
         <ha-icon-button
           .label=${"Edit reminder"}
@@ -848,6 +1055,9 @@ export class BtoddbRemindersCard extends LitElement {
     .item.delivered .leading {
       color: var(--secondary-text-color, #727272);
     }
+    .item.recurring .leading {
+      color: var(--accent-color, var(--primary-color, #03a9f4));
+    }
     .time {
       color: var(--secondary-text-color, #727272);
       font-size: 12px;
@@ -855,6 +1065,75 @@ export class BtoddbRemindersCard extends LitElement {
     ha-icon-button {
       color: var(--secondary-text-color, #727272);
       flex: 0 0 auto;
+    }
+    /* Repeat disclosure */
+    .repeat-row {
+      padding-top: 6px;
+    }
+    .repeat-toggle {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      color: var(--secondary-text-color, #727272);
+      font-family: inherit;
+      font-size: 13px;
+    }
+    .repeat-toggle:hover {
+      color: var(--primary-color, #03a9f4);
+    }
+    .repeat-body {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-top: 6px;
+      padding: 8px 10px;
+      border: 1px solid var(--divider-color, #e0e0e0);
+      border-radius: 4px;
+    }
+    .freq-select {
+      height: 36px;
+      padding: 0 8px;
+      border: 1px solid var(--divider-color, #e0e0e0);
+      border-radius: 4px;
+      background: var(--card-background-color, #fff);
+      color: var(--primary-text-color, #212121);
+      color-scheme: light dark;
+      font-family: inherit;
+      font-size: 14px;
+    }
+    .weekday-chips {
+      display: flex;
+      gap: 4px;
+    }
+    .chip {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 1px solid var(--divider-color, #e0e0e0);
+      background: var(--card-background-color, #fff);
+      color: var(--secondary-text-color, #727272);
+      font-size: 11px;
+      font-family: inherit;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    .chip.selected {
+      background: var(--primary-color, #03a9f4);
+      color: var(--text-primary-color, #fff);
+      border-color: var(--primary-color, #03a9f4);
+    }
+    .chip:hover:not(.selected) {
+      border-color: var(--primary-color, #03a9f4);
+      color: var(--primary-color, #03a9f4);
     }
   `;
 }

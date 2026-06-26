@@ -60,9 +60,11 @@ from .const import (
 from .delivery import (
     CATCHUP_FLOOR,
     ReminderEvent,
+    advance_recurring,
     due_events,
     effective_watermark,
     resolve_notify_target,
+    validate_rrule,
 )
 from .location import LocationReminder, transition_kind, triggered
 from .location_store import LocationReminderStore
@@ -94,6 +96,7 @@ SERVICE_UPDATE = "update"
 ATTR_MESSAGE = "message"
 ATTR_WHEN = "when"
 ATTR_IN_MINUTES = "in_minutes"
+ATTR_RRULE = "rrule"
 
 SERVICE_CREATE_LOCATION = "create_location"
 SERVICE_UPDATE_LOCATION = "update_location"
@@ -124,6 +127,7 @@ CREATE_SCHEMA = vol.Schema(
         vol.Required(ATTR_MESSAGE): cv.string,
         vol.Optional(ATTR_WHEN): vol.Any(None, cv.string),
         vol.Optional(ATTR_IN_MINUTES): _optional_minutes,
+        vol.Optional(ATTR_RRULE): vol.Any(None, cv.string),
     }
 )
 
@@ -133,6 +137,7 @@ UPDATE_SCHEMA = vol.Schema(
         vol.Optional(ATTR_MESSAGE): cv.string,
         vol.Optional(ATTR_WHEN): vol.Any(None, cv.string),
         vol.Optional(ATTR_IN_MINUTES): _optional_minutes,
+        vol.Optional(ATTR_RRULE): vol.Any(None, cv.string),
     }
 )
 
@@ -405,12 +410,20 @@ def _async_register_service(hass: HomeAssistant, store: ReminderStore) -> None:
                 f" (when={when_v!r}, in_minutes={mins_v!r})"
             )
             raise ServiceValidationError(msg)
-        event = ReminderEvent(uid=uuid.uuid4().hex, summary=message, start=start)
+        rrule: str | None = call.data.get(ATTR_RRULE) or None
+        if rrule is not None:
+            err = validate_rrule(rrule, start)
+            if err is not None:
+                raise ServiceValidationError(err)
+        event = ReminderEvent(
+            uid=uuid.uuid4().hex, summary=message, start=start, rrule=rrule
+        )
         await store.async_add_event(event)
         return {
             "success": True,
             "message": message,
             "start": format_spoken_time(start, now),
+            **({"rrule": rrule} if rrule is not None else {}),
         }
 
     async def _handle_update(call: ServiceCall) -> ServiceResponse:
@@ -420,13 +433,32 @@ def _async_register_service(hass: HomeAssistant, store: ReminderStore) -> None:
         start = _resolve_start(
             now, call.data.get(ATTR_WHEN), call.data.get(ATTR_IN_MINUTES)
         )
-        if message is None and start is None:
-            msg = "Provide at least one of message, when, or in_minutes to update."
+        rrule_in_call = ATTR_RRULE in call.data
+        new_rrule: str | None = (
+            (call.data.get(ATTR_RRULE) or None) if rrule_in_call else None
+        )
+        if message is None and start is None and not rrule_in_call:
+            msg = (
+                "Provide at least one of message, when, in_minutes, or rrule to update."
+            )
             raise ServiceValidationError(msg)
         if start is not None and start < now:
             msg = f"Cannot update reminder to a time in the past ({start.isoformat()})."
             raise ServiceValidationError(msg)
-        found = await store.async_update_event(uid, summary=message, start=start)
+        if new_rrule is not None:
+            check_start = start or next(
+                (e.start for e in store.events if e.uid == uid), now
+            )
+            err = validate_rrule(new_rrule, check_start)
+            if err is not None:
+                raise ServiceValidationError(err)
+        found = await store.async_update_event(
+            uid,
+            summary=message,
+            start=start,
+            rrule=new_rrule,
+            rrule_changed=rrule_in_call,
+        )
         if not found:
             msg = f"Reminder with uid {uid!r} not found."
             raise ServiceValidationError(msg)
@@ -535,6 +567,26 @@ class ReminderDelivery:
             await async_send_notification(
                 self._hass, domain, service, NOTIFY_TITLE, event.summary
             )
+            next_event = advance_recurring(event, now)
+            if next_event is not None:
+                await self._store.async_replace_event(event.uid, next_event)
+
+        # Self-heal recurring events whose start slipped behind the 6h watermark
+        # floor (e.g. after a long HA outage). These events are not in due_events
+        # (missed the window) and would be silently pruned if left in the past —
+        # advance them to the next future occurrence so they keep firing.
+        for event in list(self._store.events):
+            if event.rrule is not None and event.start <= watermark:
+                next_event = advance_recurring(event, now)
+                if next_event is not None:
+                    await self._store.async_replace_event(event.uid, next_event)
+                    _LOGGER.warning(
+                        "Recurring reminder %r missed its scheduled time (%s); "
+                        "advanced to next occurrence at %s",
+                        event.summary,
+                        event.start.isoformat(),
+                        next_event.start.isoformat(),
+                    )
 
         await self._store.async_set_watermark(now)
         await self._store.async_prune(now - PRUNE_RETENTION)

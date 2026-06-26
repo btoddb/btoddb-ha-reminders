@@ -35,6 +35,19 @@ create:
           min: 0
           mode: box
           unit_of_measurement: minutes
+    rrule:
+      name: Recurrence rule
+      description: >-
+        iCalendar RRULE string for recurring reminders. Supported values:
+        "FREQ=DAILY" (fires every day at the same time) or
+        "FREQ=WEEKLY;BYDAY=MO" (fires every week on the same day — replace MO
+        with TU/WE/TH/FR/SA/SU for other weekdays). Set "when" to the first
+        desired occurrence; after each delivery the next occurrence is
+        scheduled automatically.
+      required: false
+      example: "FREQ=DAILY"
+      selector:
+        text:
 
 update:
   name: Update reminder
@@ -77,6 +90,16 @@ update:
           min: 0
           mode: box
           unit_of_measurement: minutes
+    rrule:
+      name: Recurrence rule
+      description: >-
+        New RRULE for this reminder ("FREQ=DAILY", "FREQ=WEEKLY;BYDAY=MO", etc.).
+        Pass an empty string or null to convert a recurring reminder back to a
+        one-shot. Omit to leave the recurrence unchanged.
+      required: false
+      example: "FREQ=WEEKLY;BYDAY=MO"
+      selector:
+        text:
 
 create_location:
   name: Create location reminder
