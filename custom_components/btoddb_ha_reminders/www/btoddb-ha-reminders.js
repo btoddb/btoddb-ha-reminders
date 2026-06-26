@@ -56,8 +56,8 @@ var H=globalThis,N=H.ShadowRoot&&(H.ShadyCSS===void 0||H.ShadyCSS.nativeShadow)&
           .value=${this._when}
           @input=${i=>{this._when=i.target.value}}
         />
-        ${e?u`<button class="btn btn-secondary" ?disabled=${this._busy} @click=${()=>this._cancelEdit()}>Cancel</button>`:l}
-        <button class="btn btn-primary" ?disabled=${this._busy} @click=${()=>this._add()}>
+        ${e?u`<button type="button" class="btn btn-secondary" ?disabled=${this._busy} @click=${()=>this._cancelEdit()}>Cancel</button>`:l}
+        <button type="button" class="btn btn-primary" ?disabled=${this._busy} @click=${()=>this._add()}>
           ${e?"Save":"Add"}
         </button>
       </div>
@@ -94,8 +94,9 @@ var H=globalThis,N=H.ShadowRoot&&(H.ShadyCSS===void 0||H.ShadyCSS.nativeShadow)&
           <option value="enter">Entering</option>
           <option value="leave">Leaving</option>
         </select>
-        ${e?u`<button class="btn btn-secondary" ?disabled=${this._busy} @click=${()=>this._cancelEdit()}>Cancel</button>`:l}
+        ${e?u`<button type="button" class="btn btn-secondary" ?disabled=${this._busy} @click=${()=>this._cancelEdit()}>Cancel</button>`:l}
         <button
+          type="button"
           class="btn btn-primary"
           ?disabled=${this._busy}
           @click=${()=>this._addLocation()}
@@ -325,7 +326,7 @@ var H=globalThis,N=H.ShadowRoot&&(H.ShadyCSS===void 0||H.ShadyCSS.nativeShadow)&
       color: var(--secondary-text-color, #727272);
       flex: 0 0 auto;
     }
-  `;customElements.get("btoddb-reminders-card")||customElements.define("btoddb-reminders-card",L);var Nt="v0.0.30";console.info(`%c BTODDB-HA-REMINDERS %c ${Nt} `,"color: white; background: #03a9f4; font-weight: 700;","color: #03a9f4; background: white; font-weight: 700;");window.customCards=window.customCards||[];window.customCards.push({type:"btoddb-reminders-card",name:"BToddB Reminders",description:"Create reminders and see the upcoming ones.",preview:!1,documentationURL:"https://github.com/btoddb/btoddb-ha-reminders"});
+  `;customElements.get("btoddb-reminders-card")||customElements.define("btoddb-reminders-card",L);var Nt="v0.0.31";console.info(`%c BTODDB-HA-REMINDERS %c ${Nt} `,"color: white; background: #03a9f4; font-weight: 700;","color: #03a9f4; background: white; font-weight: 700;");window.customCards=window.customCards||[];window.customCards.push({type:"btoddb-reminders-card",name:"BToddB Reminders",description:"Create reminders and see the upcoming ones.",preview:!1,documentationURL:"https://github.com/btoddb/btoddb-ha-reminders"});
 /*! Bundled license information:
 
 @lit/reactive-element/css-tag.js:

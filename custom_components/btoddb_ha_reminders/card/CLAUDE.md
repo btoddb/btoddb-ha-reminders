@@ -5,12 +5,12 @@ The `btoddb-reminders-card` Lovelace card for the Reminders integration.
 ## What it does
 
 - A **Time / Location** tab toggle picks which add-row shows.
-- **Time** add row (native text `input` + native `datetime-local` input + `mwc-button`)
+- **Time** add row (native text `input` + native `datetime-local` input + native `<button>`)
   calls the **response-only** `btoddb_ha_reminders.create` service (`returnResponse` must be
   `true`). The message uses a styled native `<input>` rather than `ha-textfield` so it
   always renders even where that HA element isn't loaded.
 - **Location** add row (native text `input` + two `ha-entity-picker`s for person/zone + a
-  native `<select>` for enter/leave + `mwc-button`) calls `btoddb_ha_reminders.create_location`.
+  native `<select>` for enter/leave + native `<button>`) calls `btoddb_ha_reminders.create_location`.
 - A single merged list shows both kinds of reminder:
   - Time reminders read from the `calendar.btoddb_reminders` entity via the calendar REST
     API (`GET calendars/<entity>?start=&end=`); deleted via the `calendar/event/delete`
@@ -22,8 +22,8 @@ The `btoddb-reminders-card` Lovelace card for the Reminders integration.
   delete) and once a minute (so times stay fresh and fired reminders drop off); location
   rows re-render on any `hass` update since they read from entity state.
 
-It is built from **stock HA web components** (`ha-card`, `ha-icon`, `ha-icon-button`,
-`mwc-button`) plus native `<input>`s and Lit — no `custom-card-helpers`.
+It is built from **stock HA web components** (`ha-card`, `ha-icon`, `ha-icon-button`)
+plus native `<input>`s, native `<button>`s, and Lit — no `custom-card-helpers`.
 
 ## Source / build / deploy
 

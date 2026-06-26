@@ -1,8 +1,8 @@
 // The `btoddb-reminders-card` Lovelace card.
 //
 // Two jobs, using stock Home Assistant web components (ha-card, ha-icon-button,
-// ha-icon, mwc-button) where they're reliably loaded, and native inputs for the
-// add row so the message and datetime fields always render:
+// ha-icon) where they're reliably loaded, and native inputs and buttons for the
+// add row so the message, datetime, and action elements always render:
 //   1. Type a new reminder (message + datetime) and call `btoddb_ha_reminders.create`.
 //   2. List upcoming reminders, read from the `calendar.btoddb_reminders` entity, with a
 //      per-row delete button (calendar/event/delete).
@@ -525,9 +525,9 @@ export class BtoddbRemindersCard extends LitElement {
       }}
         />
         ${isEditing
-        ? html`<button class="btn btn-secondary" ?disabled=${this._busy} @click=${() => this._cancelEdit()}>Cancel</button>`
+        ? html`<button type="button" class="btn btn-secondary" ?disabled=${this._busy} @click=${() => this._cancelEdit()}>Cancel</button>`
         : nothing}
-        <button class="btn btn-primary" ?disabled=${this._busy} @click=${() => this._add()}>
+        <button type="button" class="btn btn-primary" ?disabled=${this._busy} @click=${() => this._add()}>
           ${isEditing ? "Save" : "Add"}
         </button>
       </div>
@@ -578,9 +578,10 @@ export class BtoddbRemindersCard extends LitElement {
           <option value="leave">Leaving</option>
         </select>
         ${isEditing
-        ? html`<button class="btn btn-secondary" ?disabled=${this._busy} @click=${() => this._cancelEdit()}>Cancel</button>`
+        ? html`<button type="button" class="btn btn-secondary" ?disabled=${this._busy} @click=${() => this._cancelEdit()}>Cancel</button>`
         : nothing}
         <button
+          type="button"
           class="btn btn-primary"
           ?disabled=${this._busy}
           @click=${() => this._addLocation()}
