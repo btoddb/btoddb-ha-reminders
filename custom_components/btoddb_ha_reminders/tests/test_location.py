@@ -16,7 +16,14 @@ LEAVE = location.LEAVE
 NOW = datetime(2026, 6, 21, 12, 0, tzinfo=UTC)
 
 
-def _rem(uid, person="person.todd", zone="zone.work", trigger=ENTER, delivered=None):
+def _rem(
+    uid,
+    person="person.todd",
+    zone="zone.work",
+    trigger=ENTER,
+    delivered=None,
+    persistent=False,
+):
     return LocationReminder(
         uid=uid,
         summary=uid,
@@ -24,6 +31,7 @@ def _rem(uid, person="person.todd", zone="zone.work", trigger=ENTER, delivered=N
         zone=zone,
         trigger=trigger,
         delivered_at=delivered,
+        persistent=persistent,
     )
 
 
@@ -84,6 +92,20 @@ def test_filters_by_trigger_kind():
 def test_already_delivered_excluded():
     reminders = [_rem("fresh"), _rem("done", delivered=NOW)]
     assert {r.uid for r in triggered(reminders, "person.todd", ENTER)} == {"fresh"}
+
+
+def test_persistent_reminder_included_when_undelivered():
+    # persistent=True with delivered_at=None behaves like a regular undelivered reminder
+    reminders = [_rem("p", persistent=True)]
+    assert {r.uid for r in triggered(reminders, "person.todd", ENTER)} == {"p"}
+
+
+def test_persistent_reminder_excluded_when_delivered():
+    # delivered_at should never be set on a persistent reminder (the store guards it),
+    # but triggered() must still exclude any that somehow carry a timestamp so the
+    # snapshot-in-storage case is handled correctly.
+    reminders = [_rem("p", persistent=True, delivered=NOW)]
+    assert triggered(reminders, "person.todd", ENTER) == []
 
 
 # --- retention predicate (mirrors LocationReminderStore.async_prune) --------------

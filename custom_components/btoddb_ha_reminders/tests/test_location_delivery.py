@@ -93,13 +93,14 @@ def _enter_home_event(person="person.todd"):
     )
 
 
-def _reminder():
+def _reminder(persistent=False):
     return LocationReminder(
         uid="x",
         summary="grab keys",
         person="person.todd",
         zone="zone.home",
         trigger="enter",
+        persistent=persistent,
     )
 
 
@@ -133,5 +134,28 @@ def test_failed_notify_does_not_mark_delivered():
     asyncio.run(delivery._handle_state_change(_enter_home_event()))
     # It attempted the push but must NOT cross the reminder off.
     assert len(hass.services.calls) == 1
+    assert store.delivered == []
+    assert store.events[0].delivered_at is None
+
+
+def test_persistent_reminder_not_marked_delivered_on_success():
+    hass = _FakeHass(fail=False)
+    store = _FakeStore([_reminder(persistent=True)])
+    delivery = pkg.LocationDelivery(hass, _entry(), store)
+    asyncio.run(delivery._handle_state_change(_enter_home_event()))
+    # Notification was sent but the reminder must stay undelivered so it fires again.
+    assert len(hass.services.calls) == 1
+    assert store.delivered == []
+    assert store.events[0].delivered_at is None
+
+
+def test_persistent_reminder_fires_on_every_transition():
+    hass = _FakeHass(fail=False)
+    store = _FakeStore([_reminder(persistent=True)])
+    delivery = pkg.LocationDelivery(hass, _entry(), store)
+    asyncio.run(delivery._handle_state_change(_enter_home_event()))
+    asyncio.run(delivery._handle_state_change(_enter_home_event()))
+    asyncio.run(delivery._handle_state_change(_enter_home_event()))
+    assert len(hass.services.calls) == 3
     assert store.delivered == []
     assert store.events[0].delivered_at is None

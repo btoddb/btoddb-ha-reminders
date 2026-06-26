@@ -105,6 +105,7 @@ ATTR_PERSON = "person"
 ATTR_ZONE = "zone"
 ATTR_TRIGGER = "trigger"
 ATTR_UID = "uid"
+ATTR_PERSISTENT = "persistent"
 TRIGGER_VALUES = ("enter", "leave")
 
 
@@ -149,6 +150,7 @@ CREATE_LOCATION_SCHEMA = vol.Schema(
         vol.Required(ATTR_PERSON): cv.entity_domain("person"),
         vol.Required(ATTR_ZONE): cv.entity_domain("zone"),
         vol.Required(ATTR_TRIGGER): vol.In(TRIGGER_VALUES),
+        vol.Optional(ATTR_PERSISTENT, default=False): cv.boolean,
     }
 )
 
@@ -159,6 +161,7 @@ UPDATE_LOCATION_SCHEMA = vol.Schema(
         vol.Optional(ATTR_PERSON): cv.entity_domain("person"),
         vol.Optional(ATTR_ZONE): cv.entity_domain("zone"),
         vol.Optional(ATTR_TRIGGER): vol.In(TRIGGER_VALUES),
+        vol.Optional(ATTR_PERSISTENT): cv.boolean,
     }
 )
 
@@ -500,6 +503,7 @@ def _async_register_location_services(
             person=call.data[ATTR_PERSON],
             zone=call.data[ATTR_ZONE],
             trigger=call.data[ATTR_TRIGGER],
+            persistent=call.data.get(ATTR_PERSISTENT, False),
         )
         await store.async_add_event(reminder)
 
@@ -516,11 +520,23 @@ def _async_register_location_services(
         person: str | None = call.data.get(ATTR_PERSON)
         zone: str | None = call.data.get(ATTR_ZONE)
         trigger: str | None = call.data.get(ATTR_TRIGGER)
-        if message is None and person is None and zone is None and trigger is None:
+        persistent: bool | None = call.data.get(ATTR_PERSISTENT)
+        if (
+            message is None
+            and person is None
+            and zone is None
+            and trigger is None
+            and persistent is None
+        ):
             msg = "Provide at least one field to update."
             raise ServiceValidationError(msg)
         await store.async_update_event(
-            uid, summary=message, person=person, zone=zone, trigger=trigger
+            uid,
+            summary=message,
+            person=person,
+            zone=zone,
+            trigger=trigger,
+            persistent=persistent,
         )
 
     async def _handle_delete_location(call: ServiceCall) -> None:
@@ -669,8 +685,17 @@ class LocationDelivery:
             for reminder in triggered(reminders, person, kind):
                 # Only cross it off once the push actually went out — a failed notify
                 # must leave the reminder pending so it can fire on a later transition.
-                if await async_send_notification(
-                    self._hass, domain, service, NOTIFY_TITLE_LOCATION, reminder.summary
+                # Persistent reminders are never marked delivered; they re-fire every
+                # time the condition is met.
+                if (
+                    await async_send_notification(
+                        self._hass,
+                        domain,
+                        service,
+                        NOTIFY_TITLE_LOCATION,
+                        reminder.summary,
+                    )
+                    and not reminder.persistent
                 ):
                     await self._store.async_mark_delivered(reminder.uid, now)
 

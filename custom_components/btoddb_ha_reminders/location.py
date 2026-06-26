@@ -36,6 +36,9 @@ class LocationReminder:
     ``person`` and ``zone`` are entity_ids (e.g. ``person.todd``, ``zone.work``).
     ``trigger`` is :data:`ENTER` or :data:`LEAVE`. ``delivered_at`` is ``None`` until
     the reminder fires, then a timezone-aware local datetime (one-shot — LOC-3).
+
+    When ``persistent`` is ``True`` the reminder is never marked delivered — it re-fires
+    on every matching zone transition, like a recurring time-based reminder.
     """
 
     uid: str
@@ -44,6 +47,7 @@ class LocationReminder:
     zone: str
     trigger: str
     delivered_at: datetime | None = None
+    persistent: bool = False
 
 
 def transition_kind(
