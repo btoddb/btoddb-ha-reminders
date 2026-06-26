@@ -62,6 +62,23 @@ _BYDAY_TO_WEEKDAY: dict[str, int] = {
 _BYDAY_NAMES = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"]
 
 
+def _parse_rrule_parts(upper: str) -> dict[str, str]:
+    """Parse a semicolon-separated RRULE string into a ``KEY -> VALUE`` dict."""
+    parts: dict[str, str] = {}
+    for token in upper.split(";"):
+        if "=" in token:
+            key, _, value = token.partition("=")
+            parts[key.strip()] = value.strip()
+    return parts
+
+
+_SUPPORTED_RRULE_MSG = (
+    "Supported: FREQ=DAILY, FREQ=WEEKLY (with optional BYDAY=MO/TU/WE/TH/FR/SA/SU)."
+)
+_DAILY_ALLOWED_KEYS: frozenset[str] = frozenset({"FREQ"})
+_WEEKLY_ALLOWED_KEYS: frozenset[str] = frozenset({"FREQ", "BYDAY"})
+
+
 def advance_recurring(event: ReminderEvent, now: datetime) -> ReminderEvent | None:
     """
     Return the next occurrence of a recurring reminder strictly after ``now``.
@@ -71,17 +88,18 @@ def advance_recurring(event: ReminderEvent, now: datetime) -> ReminderEvent | No
     so a missed occurrence (start slipped behind the watermark floor after an
     outage) self-heals to the nearest future slot instead of staying stuck.
 
-    Supported RRULE prefixes:
+    Supported RRULE values:
     - ``FREQ=DAILY`` — advance by one day per step
     - ``FREQ=WEEKLY`` — advance by seven days per step; ``BYDAY`` is validated at
       create time so the start date is always on the correct weekday
     """
     if event.rrule is None:
         return None
-    upper = event.rrule.upper()
-    if "FREQ=DAILY" in upper:
+    parts = _parse_rrule_parts(event.rrule.upper())
+    freq = parts.get("FREQ")
+    if freq == "DAILY":
         step = timedelta(days=1)
-    elif "FREQ=WEEKLY" in upper:
+    elif freq == "WEEKLY":
         step = timedelta(weeks=1)
     else:
         return None
@@ -99,31 +117,41 @@ def validate_rrule(rrule: str, start: datetime) -> str | None:
     - ``FREQ=DAILY``
     - ``FREQ=WEEKLY`` with optional ``BYDAY=<MO|TU|WE|TH|FR|SA|SU>``
 
+    Unknown keys (e.g. ``INTERVAL``, ``COUNT``, ``UNTIL``) are rejected so that
+    the RRULE string matches the integration's actual roll-forward behaviour.
+
     For ``FREQ=WEEKLY;BYDAY=X``, the weekday of ``start`` must match ``X`` so that
     adding 7 days on each roll-forward keeps the event on the correct weekday.
     """
-    upper = rrule.upper()
-    if "FREQ=DAILY" in upper:
-        return None
-    if "FREQ=WEEKLY" in upper:
-        for part in upper.split(";"):
-            if part.startswith("BYDAY="):
-                byday = part[6:]
-                if byday not in _BYDAY_TO_WEEKDAY:
-                    return f"Unknown BYDAY value {byday!r}. Use MO/TU/WE/TH/FR/SA/SU."
-                expected = _BYDAY_TO_WEEKDAY[byday]
-                if start.weekday() != expected:
-                    actual = _BYDAY_NAMES[start.weekday()]
-                    return (
-                        f"BYDAY={byday} does not match the weekday of 'when' "
-                        f"({actual}); set 'when' to a {byday} date."
-                    )
-        return None
-    return (
-        f"Unsupported rrule {rrule!r}. "
-        f"Supported: FREQ=DAILY, "
-        f"FREQ=WEEKLY (with optional BYDAY=MO/TU/WE/TH/FR/SA/SU)."
-    )
+    parts = _parse_rrule_parts(rrule.upper())
+    freq = parts.get("FREQ")
+
+    if freq == "DAILY":
+        allowed = _DAILY_ALLOWED_KEYS
+    elif freq == "WEEKLY":
+        allowed = _WEEKLY_ALLOWED_KEYS
+    else:
+        return f"Unsupported rrule {rrule!r}. {_SUPPORTED_RRULE_MSG}"
+
+    unknown = set(parts) - allowed
+    if unknown:
+        unknown_str = ", ".join(sorted(unknown))
+        return f"Unknown RRULE part(s) {unknown_str!r}. {_SUPPORTED_RRULE_MSG}"
+
+    if freq == "WEEKLY":
+        byday = parts.get("BYDAY")
+        if byday is not None:
+            if byday not in _BYDAY_TO_WEEKDAY:
+                return f"Unknown BYDAY value {byday!r}. Use MO/TU/WE/TH/FR/SA/SU."
+            expected = _BYDAY_TO_WEEKDAY[byday]
+            if start.weekday() != expected:
+                actual = _BYDAY_NAMES[start.weekday()]
+                return (
+                    f"BYDAY={byday} does not match the weekday of 'when' "
+                    f"({actual}); set 'when' to a {byday} date."
+                )
+
+    return None
 
 
 def resolve_notify_target(configured: str) -> tuple[str, str]:

@@ -210,3 +210,41 @@ def test_validate_rrule_unknown_byday_returns_error():
     err = validate_rrule("FREQ=WEEKLY;BYDAY=XX", NOW)
     assert err is not None
     assert "XX" in err
+
+
+def test_validate_rrule_daily_with_interval_rejected():
+    # INTERVAL is not honoured by advance_recurring; reject it explicitly.
+    err = validate_rrule("FREQ=DAILY;INTERVAL=3", NOW)
+    assert err is not None
+    assert "INTERVAL" in err
+
+
+def test_validate_rrule_daily_with_count_rejected():
+    err = validate_rrule("FREQ=DAILY;COUNT=5", NOW)
+    assert err is not None
+    assert "COUNT" in err
+
+
+def test_validate_rrule_weekly_with_interval_rejected():
+    err = validate_rrule("FREQ=WEEKLY;BYDAY=SU;INTERVAL=2", NOW)
+    assert err is not None
+    assert "INTERVAL" in err
+
+
+def test_validate_rrule_loose_substring_not_accepted():
+    # "XFREQ=DAILYX" contains "FREQ=DAILY" as a substring but must NOT pass.
+    err = validate_rrule("XFREQ=DAILYX", NOW)
+    assert err is not None
+
+
+def test_advance_recurring_daily_interval_ignored_returns_none():
+    # After the fix, an rrule with INTERVAL is invalid at create time, but if one
+    # somehow reaches advance_recurring, FREQ=DAILY is still honoured (only the
+    # FREQ key drives the step; unknown parts are silently ignored here).
+    event = ReminderEvent(
+        uid="r1", summary="test", start=NOW, rrule="FREQ=DAILY;INTERVAL=3"
+    )
+    nxt = advance_recurring(event, NOW)
+    # advance_recurring extracts FREQ=DAILY and advances by 1 day regardless.
+    assert nxt is not None
+    assert nxt.start == NOW + timedelta(days=1)
