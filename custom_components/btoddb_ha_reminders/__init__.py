@@ -60,6 +60,7 @@ from .const import (
 from .delivery import (
     CATCHUP_FLOOR,
     ReminderEvent,
+    advance_recurring,
     due_events,
     effective_watermark,
     resolve_notify_target,
@@ -94,6 +95,7 @@ SERVICE_UPDATE = "update"
 ATTR_MESSAGE = "message"
 ATTR_WHEN = "when"
 ATTR_IN_MINUTES = "in_minutes"
+ATTR_RRULE = "rrule"
 
 SERVICE_CREATE_LOCATION = "create_location"
 SERVICE_UPDATE_LOCATION = "update_location"
@@ -124,6 +126,7 @@ CREATE_SCHEMA = vol.Schema(
         vol.Required(ATTR_MESSAGE): cv.string,
         vol.Optional(ATTR_WHEN): vol.Any(None, cv.string),
         vol.Optional(ATTR_IN_MINUTES): _optional_minutes,
+        vol.Optional(ATTR_RRULE): vol.Any(None, cv.string),
     }
 )
 
@@ -405,12 +408,16 @@ def _async_register_service(hass: HomeAssistant, store: ReminderStore) -> None:
                 f" (when={when_v!r}, in_minutes={mins_v!r})"
             )
             raise ServiceValidationError(msg)
-        event = ReminderEvent(uid=uuid.uuid4().hex, summary=message, start=start)
+        rrule: str | None = call.data.get(ATTR_RRULE) or None
+        event = ReminderEvent(
+            uid=uuid.uuid4().hex, summary=message, start=start, rrule=rrule
+        )
         await store.async_add_event(event)
         return {
             "success": True,
             "message": message,
             "start": format_spoken_time(start, now),
+            **({"rrule": rrule} if rrule is not None else {}),
         }
 
     async def _handle_update(call: ServiceCall) -> ServiceResponse:
@@ -535,6 +542,9 @@ class ReminderDelivery:
             await async_send_notification(
                 self._hass, domain, service, NOTIFY_TITLE, event.summary
             )
+            next_event = advance_recurring(event)
+            if next_event is not None:
+                await self._store.async_replace_event(event.uid, next_event)
 
         await self._store.async_set_watermark(now)
         await self._store.async_prune(now - PRUNE_RETENTION)

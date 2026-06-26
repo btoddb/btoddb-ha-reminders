@@ -49,7 +49,12 @@ class ReminderStore:
             if start is None:
                 continue
             events.append(
-                ReminderEvent(uid=raw["uid"], summary=raw["summary"], start=start)
+                ReminderEvent(
+                    uid=raw["uid"],
+                    summary=raw["summary"],
+                    start=start,
+                    rrule=raw.get("rrule"),
+                )
             )
         self.events = events
         raw_wm = data.get("watermark")
@@ -59,7 +64,12 @@ class ReminderStore:
     def _data(self) -> dict:
         return {
             "events": [
-                {"uid": e.uid, "summary": e.summary, "start": e.start.isoformat()}
+                {
+                    "uid": e.uid,
+                    "summary": e.summary,
+                    "start": e.start.isoformat(),
+                    **({"rrule": e.rrule} if e.rrule is not None else {}),
+                }
                 for e in self.events
             ],
             "watermark": self.watermark.isoformat() if self.watermark else None,
@@ -125,6 +135,11 @@ class ReminderStore:
             self.events = updated
             await self._async_persist()
         return found
+
+    async def async_replace_event(self, uid: str, new_event: ReminderEvent) -> None:
+        """Replace a reminder in-place by uid (e.g. advance a recurring one)."""
+        self.events = [new_event if e.uid == uid else e for e in self.events]
+        await self._async_persist()
 
     async def async_prune(self, before: datetime) -> None:
         """Drop already-delivered events older than ``before`` to bound storage."""

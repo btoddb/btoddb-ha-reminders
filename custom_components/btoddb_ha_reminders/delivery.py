@@ -8,6 +8,7 @@ events, decide which ones are now due.
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -27,6 +28,7 @@ class ReminderEvent:
     uid: str
     summary: str
     start: datetime
+    rrule: str | None = None
 
 
 def effective_watermark(stored: datetime | None, now: datetime) -> datetime:
@@ -46,6 +48,25 @@ def due_events(
 ) -> list[ReminderEvent]:
     """Return events whose start falls in the half-open window ``(watermark, now]``."""
     return [e for e in events if watermark < e.start <= now]
+
+
+def advance_recurring(event: ReminderEvent) -> ReminderEvent | None:
+    """
+    Return the next occurrence of a recurring reminder, or ``None`` if not recurring.
+
+    Supported RRULE prefixes:
+    - ``FREQ=DAILY`` — advance by one day
+    - ``FREQ=WEEKLY`` — advance by seven days (``BYDAY`` documents the weekday but the
+      caller is expected to set ``start`` on the correct weekday when creating)
+    """
+    if event.rrule is None:
+        return None
+    upper = event.rrule.upper()
+    if "FREQ=DAILY" in upper:
+        return dataclasses.replace(event, start=event.start + timedelta(days=1))
+    if "FREQ=WEEKLY" in upper:
+        return dataclasses.replace(event, start=event.start + timedelta(weeks=1))
+    return None
 
 
 def resolve_notify_target(configured: str) -> tuple[str, str]:

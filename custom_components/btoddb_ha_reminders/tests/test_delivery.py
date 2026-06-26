@@ -12,6 +12,7 @@ ReminderEvent = delivery.ReminderEvent
 due_events = delivery.due_events
 effective_watermark = delivery.effective_watermark
 resolve_notify_target = delivery.resolve_notify_target
+advance_recurring = delivery.advance_recurring
 
 TZ = UTC
 NOW = datetime(2026, 6, 21, 12, 0, tzinfo=TZ)
@@ -80,3 +81,58 @@ def test_resolve_notify_target_parses_persistent_notification():
         "notify",
         "persistent_notification",
     )
+
+
+# ---------------------------------------------------------------------------
+# advance_recurring() — roll-forward for recurring reminders.
+# ---------------------------------------------------------------------------
+
+
+def _recurring_ev(rrule):
+    return ReminderEvent(uid="r1", summary="medicine", start=NOW, rrule=rrule)
+
+
+def test_advance_recurring_returns_none_for_one_shot():
+    event = ReminderEvent(uid="1", summary="one-shot", start=NOW)
+    assert advance_recurring(event) is None
+
+
+def test_advance_recurring_daily_adds_one_day():
+    event = _recurring_ev("FREQ=DAILY")
+    nxt = advance_recurring(event)
+    assert nxt is not None
+    assert nxt.start == NOW + timedelta(days=1)
+    assert nxt.uid == event.uid
+    assert nxt.summary == event.summary
+    assert nxt.rrule == event.rrule
+
+
+def test_advance_recurring_weekly_adds_seven_days():
+    event = _recurring_ev("FREQ=WEEKLY;BYDAY=MO")
+    nxt = advance_recurring(event)
+    assert nxt is not None
+    assert nxt.start == NOW + timedelta(weeks=1)
+    assert nxt.rrule == event.rrule
+
+
+def test_advance_recurring_weekly_all_byday_values():
+    for day in ("MO", "TU", "WE", "TH", "FR", "SA", "SU"):
+        event = _recurring_ev(f"FREQ=WEEKLY;BYDAY={day}")
+        nxt = advance_recurring(event)
+        assert nxt is not None
+        assert nxt.start == NOW + timedelta(weeks=1)
+
+
+def test_advance_recurring_unknown_rrule_returns_none():
+    event = _recurring_ev("FREQ=MONTHLY")
+    assert advance_recurring(event) is None
+
+
+def test_advance_recurring_preserves_uid_and_summary():
+    event = ReminderEvent(
+        uid="abc123", summary="take medicine", start=NOW, rrule="FREQ=DAILY"
+    )
+    nxt = advance_recurring(event)
+    assert nxt is not None
+    assert nxt.uid == "abc123"
+    assert nxt.summary == "take medicine"
