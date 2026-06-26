@@ -36,6 +36,48 @@ create:
           mode: box
           unit_of_measurement: minutes
 
+update:
+  name: Update reminder
+  description: >-
+    Edit an existing time-based reminder by uid. Supply any combination of message,
+    when, or in_minutes; at least one must be provided. Returns {success, message,
+    start} where start is a spoken-language time string.
+  fields:
+    uid:
+      name: UID
+      description: The unique id of the reminder to update.
+      required: true
+      example: 1a2b3c4d
+      selector:
+        text:
+    message:
+      name: Message
+      description: Replacement reminder text. Omit to leave unchanged.
+      required: false
+      example: take out the trash
+      selector:
+        text:
+    when:
+      name: When
+      description: >-
+        New absolute ISO 8601 local datetime. Omit to leave unchanged.
+      required: false
+      example: "2026-06-17T18:00:00"
+      selector:
+        text:
+    in_minutes:
+      name: In minutes
+      description: >-
+        New relative delay in minutes from now. Takes priority over when when both
+        are given. Omit to leave unchanged.
+      required: false
+      example: 5
+      selector:
+        number:
+          min: 0
+          mode: box
+          unit_of_measurement: minutes
+
 create_location:
   name: Create location reminder
   description: >-
@@ -69,6 +111,53 @@ create_location:
       name: Trigger
       description: Deliver when the person enters the zone, or when they leave it.
       required: true
+      example: enter
+      selector:
+        select:
+          options:
+            - enter
+            - leave
+
+update_location:
+  name: Update location reminder
+  description: >-
+    Edit an existing location reminder by uid. Supply any combination of message,
+    person, zone, or trigger; at least one must be provided.
+  fields:
+    uid:
+      name: UID
+      description: The unique id of the location reminder to update.
+      required: true
+      example: 1a2b3c4d
+      selector:
+        text:
+    message:
+      name: Message
+      description: Replacement reminder text. Omit to leave unchanged.
+      required: false
+      example: grab the dry cleaning
+      selector:
+        text:
+    person:
+      name: Person
+      description: Replacement person entity. Omit to leave unchanged.
+      required: false
+      example: person.todd
+      selector:
+        entity:
+          domain: person
+    zone:
+      name: Zone
+      description: Replacement zone entity. Omit to leave unchanged.
+      required: false
+      example: zone.work
+      selector:
+        entity:
+          domain: zone
+    trigger:
+      name: Trigger
+      description: Replacement trigger (enter or leave). Omit to leave unchanged.
+      required: false
       example: enter
       selector:
         select:

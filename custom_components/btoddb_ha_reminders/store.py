@@ -13,6 +13,7 @@ RM-7a moot: a ``Store`` value is durable and restored on load by construction, s
 
 from __future__ import annotations
 
+import dataclasses
 from typing import TYPE_CHECKING
 
 from homeassistant.core import callback
@@ -95,6 +96,35 @@ class ReminderStore:
         if len(kept) != len(self.events):
             self.events = kept
             await self._async_persist()
+
+    async def async_update_event(
+        self,
+        uid: str,
+        *,
+        summary: str | None = None,
+        start: datetime | None = None,
+    ) -> bool:
+        """Update a reminder by uid and persist. Returns True if found."""
+        if summary is None and start is None:
+            return any(e.uid == uid for e in self.events)
+        found = False
+        updated: list[ReminderEvent] = []
+        for e in self.events:
+            if e.uid == uid:
+                found = True
+                updated.append(
+                    dataclasses.replace(
+                        e,
+                        summary=summary if summary is not None else e.summary,
+                        start=start if start is not None else e.start,
+                    )
+                )
+            else:
+                updated.append(e)
+        if found:
+            self.events = updated
+            await self._async_persist()
+        return found
 
     async def async_prune(self, before: datetime) -> None:
         """Drop already-delivered events older than ``before`` to bound storage."""

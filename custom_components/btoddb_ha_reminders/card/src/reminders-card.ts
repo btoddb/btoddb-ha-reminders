@@ -193,6 +193,7 @@ export class BtoddbRemindersCard extends LitElement {
     _locTrigger: { state: true },
     _busy: { state: true },
     _error: { state: true },
+    _editingUid: { state: true },
   };
 
   hass!: Hass;
@@ -207,6 +208,7 @@ export class BtoddbRemindersCard extends LitElement {
   private _locTrigger = "enter";
   private _busy = false;
   private _error = "";
+  private _editingUid = "";
 
   private _entity = DEFAULT_ENTITY;
   private _lastSignature = "";
@@ -304,23 +306,36 @@ export class BtoddbRemindersCard extends LitElement {
       this._error = "Pick a date and time.";
       return;
     }
+    const editingUid = this._editingUid;
     this._busy = true;
     this._error = "";
     try {
-      // `btoddb_ha_reminders.create` is a response-only service, so returnResponse must be true.
-      await this.hass.callService(
-        "btoddb_ha_reminders",
-        "create",
-        { message, when: this._when },
-        undefined,
-        undefined,
-        true,
-      );
+      if (editingUid) {
+        await this.hass.callService(
+          "btoddb_ha_reminders",
+          "update",
+          { uid: editingUid, message, when: this._when },
+          undefined,
+          undefined,
+          true,
+        );
+        this._editingUid = "";
+      } else {
+        // `btoddb_ha_reminders.create` is a response-only service, so returnResponse must be true.
+        await this.hass.callService(
+          "btoddb_ha_reminders",
+          "create",
+          { message, when: this._when },
+          undefined,
+          undefined,
+          true,
+        );
+      }
       this._message = "";
       this._when = defaultWhen();
       await this._fetch();
     } catch (err) {
-      this._error = `Could not create reminder: ${this._msg(err)}`;
+      this._error = `Could not ${editingUid ? "update" : "create"} reminder: ${this._msg(err)}`;
     } finally {
       this._busy = false;
     }
@@ -354,24 +369,65 @@ export class BtoddbRemindersCard extends LitElement {
       this._error = "Pick a zone.";
       return;
     }
+    const editingUid = this._editingUid;
     this._busy = true;
     this._error = "";
     try {
-      await this.hass.callService("btoddb_ha_reminders", "create_location", {
-        message,
-        person: this._locPerson,
-        zone: this._locZone,
-        trigger: this._locTrigger,
-      });
+      if (editingUid) {
+        await this.hass.callService("btoddb_ha_reminders", "update_location", {
+          uid: editingUid,
+          message,
+          person: this._locPerson,
+          zone: this._locZone,
+          trigger: this._locTrigger,
+        });
+        this._editingUid = "";
+      } else {
+        await this.hass.callService("btoddb_ha_reminders", "create_location", {
+          message,
+          person: this._locPerson,
+          zone: this._locZone,
+          trigger: this._locTrigger,
+        });
+      }
       this._locMessage = "";
       this._locPerson = "";
       this._locZone = "";
       this._locTrigger = "enter";
     } catch (err) {
-      this._error = `Could not create reminder: ${this._msg(err)}`;
+      this._error = `Could not ${editingUid ? "update" : "create"} reminder: ${this._msg(err)}`;
     } finally {
       this._busy = false;
     }
+  }
+
+  private _startEditTime(item: TimeItem): void {
+    this._editingUid = item.uid;
+    this._mode = "time";
+    this._message = item.summary;
+    this._when = toLocalInput(item.start);
+    this._error = "";
+  }
+
+  private _startEditLocation(item: LocationItem): void {
+    this._editingUid = item.uid;
+    this._mode = "location";
+    this._locMessage = item.summary;
+    this._locPerson = item.person;
+    this._locZone = item.zone;
+    this._locTrigger = item.trigger;
+    this._error = "";
+  }
+
+  private _cancelEdit(): void {
+    this._editingUid = "";
+    this._message = "";
+    this._when = defaultWhen();
+    this._locMessage = "";
+    this._locPerson = "";
+    this._locZone = "";
+    this._locTrigger = "enter";
+    this._error = "";
   }
 
   private async _deleteLocation(uid: string): Promise<void> {
@@ -445,6 +501,7 @@ export class BtoddbRemindersCard extends LitElement {
   }
 
   private _renderTimeAddRow() {
+    const isEditing = !!this._editingUid;
     return html`
       <div class="add-row">
         <input
@@ -467,14 +524,18 @@ export class BtoddbRemindersCard extends LitElement {
         this._when = (e.target as HTMLInputElement).value;
       }}
         />
+        ${isEditing
+        ? html`<mwc-button ?disabled=${this._busy} @click=${() => this._cancelEdit()}>Cancel</mwc-button>`
+        : nothing}
         <mwc-button raised ?disabled=${this._busy} @click=${() => this._add()}>
-          Add
+          ${isEditing ? "Save" : "Add"}
         </mwc-button>
       </div>
     `;
   }
 
   private _renderLocationAddRow() {
+    const isEditing = !!this._editingUid;
     return html`
       <div class="add-row">
         <input
@@ -516,12 +577,15 @@ export class BtoddbRemindersCard extends LitElement {
           <option value="enter">Entering</option>
           <option value="leave">Leaving</option>
         </select>
+        ${isEditing
+        ? html`<mwc-button ?disabled=${this._busy} @click=${() => this._cancelEdit()}>Cancel</mwc-button>`
+        : nothing}
         <mwc-button
           raised
           ?disabled=${this._busy}
           @click=${() => this._addLocation()}
         >
-          Add
+          ${isEditing ? "Save" : "Add"}
         </mwc-button>
       </div>
     `;
@@ -535,6 +599,12 @@ export class BtoddbRemindersCard extends LitElement {
           <span class="summary">${item.summary}</span>
           <span class="time">${this._formatTime(item.start)}</span>
         </div>
+        <ha-icon-button
+          .label=${"Edit reminder"}
+          @click=${() => this._startEditTime(item)}
+        >
+          <ha-icon icon="mdi:pencil-outline"></ha-icon>
+        </ha-icon-button>
         <ha-icon-button
           .label=${"Delete reminder"}
           @click=${() => this._delete(item.uid)}
@@ -560,6 +630,14 @@ export class BtoddbRemindersCard extends LitElement {
           <span class="summary">${item.summary}</span>
           <span class="time">${sub}</span>
         </div>
+        ${!item.deliveredAt
+        ? html`<ha-icon-button
+              .label=${"Edit reminder"}
+              @click=${() => this._startEditLocation(item)}
+            >
+              <ha-icon icon="mdi:pencil-outline"></ha-icon>
+            </ha-icon-button>`
+        : nothing}
         <ha-icon-button
           .label=${"Delete reminder"}
           @click=${() => this._deleteLocation(item.uid)}
@@ -585,7 +663,7 @@ export class BtoddbRemindersCard extends LitElement {
             <button
               class="tab ${this._mode === "time" ? "active" : ""}"
               @click=${() => {
-        this._mode = "time";
+        if (this._mode !== "time") { this._cancelEdit(); this._mode = "time"; }
       }}
             >
               Time
@@ -593,7 +671,7 @@ export class BtoddbRemindersCard extends LitElement {
             <button
               class="tab ${this._mode === "location" ? "active" : ""}"
               @click=${() => {
-        this._mode = "location";
+        if (this._mode !== "location") { this._cancelEdit(); this._mode = "location"; }
       }}
             >
               Location

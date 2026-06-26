@@ -8,6 +8,7 @@ delivery handler all go through this class and never touch storage directly.
 
 from __future__ import annotations
 
+import dataclasses
 from typing import TYPE_CHECKING
 
 from homeassistant.core import callback
@@ -98,6 +99,39 @@ class LocationReminderStore:
         if len(kept) != len(self.events):
             self.events = kept
             await self._async_persist()
+
+    async def async_update_event(
+        self,
+        uid: str,
+        *,
+        summary: str | None = None,
+        person: str | None = None,
+        zone: str | None = None,
+        trigger: str | None = None,
+    ) -> bool:
+        """Update a location reminder by uid and persist. Returns True if found."""
+        if summary is None and person is None and zone is None and trigger is None:
+            return any(e.uid == uid for e in self.events)
+        found = False
+        updated: list[LocationReminder] = []
+        for e in self.events:
+            if e.uid == uid:
+                found = True
+                updated.append(
+                    dataclasses.replace(
+                        e,
+                        summary=summary if summary is not None else e.summary,
+                        person=person if person is not None else e.person,
+                        zone=zone if zone is not None else e.zone,
+                        trigger=trigger if trigger is not None else e.trigger,
+                    )
+                )
+            else:
+                updated.append(e)
+        if found:
+            self.events = updated
+            await self._async_persist()
+        return found
 
     async def async_mark_delivered(self, uid: str, when: datetime) -> None:
         """Stamp a reminder delivered (one-shot — LOC-3) and persist."""

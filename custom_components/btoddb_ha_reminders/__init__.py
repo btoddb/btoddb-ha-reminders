@@ -90,11 +90,13 @@ CARD_FILENAME = "btoddb-ha-reminders.js"
 _CARD_STATIC_PATH_KEY = f"{DOMAIN}_card_static_path"
 
 SERVICE_CREATE = "create"
+SERVICE_UPDATE = "update"
 ATTR_MESSAGE = "message"
 ATTR_WHEN = "when"
 ATTR_IN_MINUTES = "in_minutes"
 
 SERVICE_CREATE_LOCATION = "create_location"
+SERVICE_UPDATE_LOCATION = "update_location"
 SERVICE_DELETE_LOCATION = "delete_location"
 ATTR_PERSON = "person"
 ATTR_ZONE = "zone"
@@ -125,6 +127,15 @@ CREATE_SCHEMA = vol.Schema(
     }
 )
 
+UPDATE_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_UID): cv.string,
+        vol.Optional(ATTR_MESSAGE): cv.string,
+        vol.Optional(ATTR_WHEN): vol.Any(None, cv.string),
+        vol.Optional(ATTR_IN_MINUTES): _optional_minutes,
+    }
+)
+
 CREATE_LOCATION_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_MESSAGE): cv.string,
@@ -133,6 +144,16 @@ CREATE_LOCATION_SCHEMA = vol.Schema(
         vol.Required(ATTR_PERSON): cv.entity_domain("person"),
         vol.Required(ATTR_ZONE): cv.entity_domain("zone"),
         vol.Required(ATTR_TRIGGER): vol.In(TRIGGER_VALUES),
+    }
+)
+
+UPDATE_LOCATION_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_UID): cv.string,
+        vol.Optional(ATTR_MESSAGE): cv.string,
+        vol.Optional(ATTR_PERSON): cv.entity_domain("person"),
+        vol.Optional(ATTR_ZONE): cv.entity_domain("zone"),
+        vol.Optional(ATTR_TRIGGER): vol.In(TRIGGER_VALUES),
     }
 )
 
@@ -333,7 +354,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data[DOMAIN].pop(entry.entry_id, None)
         if not hass.data[DOMAIN]:
             hass.services.async_remove(DOMAIN, SERVICE_CREATE)
+            hass.services.async_remove(DOMAIN, SERVICE_UPDATE)
             hass.services.async_remove(DOMAIN, SERVICE_CREATE_LOCATION)
+            hass.services.async_remove(DOMAIN, SERVICE_UPDATE_LOCATION)
             hass.services.async_remove(DOMAIN, SERVICE_DELETE_LOCATION)
     return unload_ok
 
@@ -343,44 +366,75 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
     await hass.config_entries.async_reload(entry.entry_id)
 
 
+def _resolve_start(
+    now: datetime,
+    when: str | None,
+    in_minutes: int | None,
+) -> datetime | None:
+    """Resolve a when/in_minutes pair to a timezone-aware local datetime."""
+    if in_minutes is not None:
+        return now + timedelta(minutes=in_minutes)
+    if when not in (None, ""):
+        parsed = dt_util.parse_datetime(when)
+        if parsed is not None:
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
+            return dt_util.as_local(parsed)
+    return None
+
+
 @callback
 def _async_register_service(hass: HomeAssistant, store: ReminderStore) -> None:
-    """Register ``btoddb_ha_reminders.create`` (idempotent; single config entry)."""
+    """Register ``btoddb_ha_reminders.create`` and ``update`` (idempotent)."""
     if hass.services.has_service(DOMAIN, SERVICE_CREATE):
         return
 
     async def _handle_create(call: ServiceCall) -> ServiceResponse:
         message: str = call.data[ATTR_MESSAGE]
-        when = call.data.get(ATTR_WHEN)
-        in_minutes = call.data.get(ATTR_IN_MINUTES)
         now = dt_util.now()
-
         # in_minutes wins if both are given (RM-4a): the home computes now + offset so
         # the model never does clock arithmetic.
-        start = None
-        if in_minutes is not None:
-            start = now + timedelta(minutes=in_minutes)
-        elif when not in (None, ""):
-            parsed = dt_util.parse_datetime(when)
-            if parsed is not None:
-                if parsed.tzinfo is None:
-                    parsed = parsed.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
-                start = dt_util.as_local(parsed)
-
+        start = _resolve_start(
+            now, call.data.get(ATTR_WHEN), call.data.get(ATTR_IN_MINUTES)
+        )
         if start is None:
+            when_v = call.data.get(ATTR_WHEN)
+            mins_v = call.data.get(ATTR_IN_MINUTES)
             msg = (
-                f"Could not determine reminder time (when={when!r}, "
-                f"in_minutes={in_minutes!r})"
+                f"Could not determine reminder time"
+                f" (when={when_v!r}, in_minutes={mins_v!r})"
             )
             raise ServiceValidationError(msg)
-
         event = ReminderEvent(uid=uuid.uuid4().hex, summary=message, start=start)
         await store.async_add_event(event)
-
         return {
             "success": True,
             "message": message,
             "start": format_spoken_time(start, now),
+        }
+
+    async def _handle_update(call: ServiceCall) -> ServiceResponse:
+        uid: str = call.data[ATTR_UID]
+        message: str | None = call.data.get(ATTR_MESSAGE)
+        now = dt_util.now()
+        start = _resolve_start(
+            now, call.data.get(ATTR_WHEN), call.data.get(ATTR_IN_MINUTES)
+        )
+        if message is None and start is None:
+            msg = "Provide at least one of message, when, or in_minutes to update."
+            raise ServiceValidationError(msg)
+        if start is not None and start < now:
+            msg = f"Cannot update reminder to a time in the past ({start.isoformat()})."
+            raise ServiceValidationError(msg)
+        found = await store.async_update_event(uid, summary=message, start=start)
+        if not found:
+            msg = f"Reminder with uid {uid!r} not found."
+            raise ServiceValidationError(msg)
+        updated = next((e for e in store.events if e.uid == uid), None)
+        return {
+            "success": True,
+            "message": updated.summary if updated else (message or ""),
+            "start": format_spoken_time(updated.start, now) if updated else "",
         }
 
     hass.services.async_register(
@@ -390,13 +444,20 @@ def _async_register_service(hass: HomeAssistant, store: ReminderStore) -> None:
         schema=CREATE_SCHEMA,
         supports_response=SupportsResponse.ONLY,
     )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_UPDATE,
+        _handle_update,
+        schema=UPDATE_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
 
 
 @callback
 def _async_register_location_services(
     hass: HomeAssistant, store: LocationReminderStore
 ) -> None:
-    """Register the ``create_location`` / ``delete_location`` services (idempotent)."""
+    """Register location reminder services (idempotent)."""
     if hass.services.has_service(DOMAIN, SERVICE_CREATE_LOCATION):
         return
 
@@ -410,6 +471,26 @@ def _async_register_location_services(
         )
         await store.async_add_event(reminder)
 
+    async def _handle_update_location(call: ServiceCall) -> None:
+        uid: str = call.data[ATTR_UID]
+        existing = next((e for e in store.events if e.uid == uid), None)
+        if existing is None:
+            msg = f"Location reminder with uid {uid!r} not found."
+            raise ServiceValidationError(msg)
+        if existing.delivered_at is not None:
+            msg = f"Location reminder with uid {uid!r} has already been delivered."
+            raise ServiceValidationError(msg)
+        message: str | None = call.data.get(ATTR_MESSAGE)
+        person: str | None = call.data.get(ATTR_PERSON)
+        zone: str | None = call.data.get(ATTR_ZONE)
+        trigger: str | None = call.data.get(ATTR_TRIGGER)
+        if message is None and person is None and zone is None and trigger is None:
+            msg = "Provide at least one field to update."
+            raise ServiceValidationError(msg)
+        await store.async_update_event(
+            uid, summary=message, person=person, zone=zone, trigger=trigger
+        )
+
     async def _handle_delete_location(call: ServiceCall) -> None:
         await store.async_delete_event(call.data[ATTR_UID])
 
@@ -418,6 +499,12 @@ def _async_register_location_services(
         SERVICE_CREATE_LOCATION,
         _handle_create_location,
         schema=CREATE_LOCATION_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_UPDATE_LOCATION,
+        _handle_update_location,
+        schema=UPDATE_LOCATION_SCHEMA,
     )
     hass.services.async_register(
         DOMAIN,

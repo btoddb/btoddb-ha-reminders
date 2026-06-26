@@ -8,7 +8,7 @@ changes (a reminder is created or pruned).
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 from homeassistant.components.calendar import (
@@ -21,8 +21,6 @@ from homeassistant.util import dt as dt_util
 from .const import CONF_CALENDAR_NAME, DATA_STORE, DEFAULT_CALENDAR_NAME, DOMAIN
 
 if TYPE_CHECKING:
-    from datetime import datetime
-
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -59,7 +57,9 @@ class ReminderCalendarEntity(CalendarEntity):
     _attr_has_entity_name = False
     _attr_icon = "mdi:alarm"
     _attr_should_poll = False
-    _attr_supported_features = CalendarEntityFeature.DELETE_EVENT
+    _attr_supported_features = (
+        CalendarEntityFeature.DELETE_EVENT | CalendarEntityFeature.UPDATE_EVENT
+    )
 
     def __init__(self, store: ReminderStore, entry: ConfigEntry) -> None:
         """Initialize bound to the store and the owning config entry."""
@@ -96,3 +96,14 @@ class ReminderCalendarEntity(CalendarEntity):
     ) -> None:
         """Delete a reminder (e.g. from the calendar card or calendar.delete_event)."""
         await self._store.async_delete_event(uid)
+
+    async def async_update_event(
+        self,
+        uid: str,
+        event: CalendarEvent,
+        recurrence_id: str | None = None,
+        recurrence_range: str | None = None,
+    ) -> None:
+        """Update a reminder (e.g. from the calendar card or calendar.update_event)."""
+        start = event.start if isinstance(event.start, datetime) else None
+        await self._store.async_update_event(uid, summary=event.summary, start=start)
