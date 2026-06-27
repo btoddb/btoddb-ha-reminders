@@ -18,9 +18,19 @@ difference between reminders that work and reminders that randomly fail.**
 - **`btoddb_ha_reminders.create`** service — `message`, plus **either** `when` (absolute ISO 8601
   local datetime) **or** `in_minutes` (relative offset). Returns
   `{success, message, start}`, where `start` is a spoken-language time string
-  ("tomorrow at 6 PM") for the agent to read back.
-- **`calendar.btoddb_reminders`** — a calendar entity listing upcoming reminders (use it with
-  a calendar dashboard card).
+  ("tomorrow at 6 PM") for the agent to read back. Optional `rrule` param enables
+  recurring reminders (`FREQ=DAILY` / `FREQ=WEEKLY;BYDAY=MO`).
+- **`btoddb_ha_reminders.create_location`** service — `message`, `person` entity, `zone`
+  entity, `trigger` (`enter` or `leave`). Fires the moment the person enters or leaves
+  that zone. Set `persistent: true` to re-fire on every matching transition rather than
+  just once.
+- **`calendar.btoddb_reminders`** — a calendar entity listing upcoming time-based reminders.
+- **`sensor.btoddb_location_reminders`** — exposes active and recently-delivered location
+  reminders; the dashboard card reads from this entity.
+- **Dashboard card** (`btoddb-reminders-card`) — auto-registered as a Lovelace resource;
+  add it to any dashboard to create, edit, and delete both time and location reminders
+  without touching Developer Tools. No hard-refresh or manual resource setup needed after
+  updates.
 - **Delivery loop** — polls every minute and on startup; pushes any newly-due reminder
   to your configured notify service (`notify.*`) as a high-priority notification. A durable,
   6h-clamped watermark means reminders that came due while HA was down are still
@@ -164,4 +174,3 @@ The full, ID'd behavior spec lives in
 
 - Option to use an **existing** calendar instead of the component-created one (the
   storage layer is already a swappable seam).
-- **Location/zone** reminders ("remind me when I get home") on the same foundation.

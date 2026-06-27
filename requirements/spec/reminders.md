@@ -113,6 +113,13 @@ mirroring how it already watches the calendar entity.
 `btoddb_ha_reminders.delete_location` service (the card's per-row delete), analogous to
 `calendar/event/delete` for time reminders.
 
+**LOC-8.** A location reminder may be marked **persistent** (`persistent: true` on
+`create_location` / `update_location`). A persistent reminder is never stamped
+`delivered_at` — it re-fires on every matching zone transition, exactly like a recurring
+time reminder. `async_mark_delivered` is a no-op for persistent reminders; the
+`tracked_persons` subscription is never released. Persistent reminders are never pruned
+by the 7-day retention sweep (they have no `delivered_at` to prune on).
+
 **LOC-out.** Non-zone locations (raw addresses) and a conversation-agent function for
 creating location reminders are out of scope for now; `zone` is stored as an entity_id
 string so an address-backed source can slot in later without reshaping the model.

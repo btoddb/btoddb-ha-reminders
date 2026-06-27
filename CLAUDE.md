@@ -31,6 +31,7 @@ fixed per phase (you do not, and cannot, switch models yourself mid-run):
 | New issue body/title, or any issue comment | `@claude plan` | **Planning only (Opus)** — posts the plan as a comment, never implements |
 | Any issue comment | `@claude implement` | **Implementation only (Sonnet)** — skips planning, implements the latest `<!-- claude:plan -->` comment and opens a PR |
 | PR comment / PR review | `@claude review` | **Line-by-line review (Opus)** — posts tagged comments; cannot change code (`contents` is read-only) |
+| PR comment / PR review | `@claude revise` | **Revision (Sonnet)** — reads the review comments and implements the requested changes, then updates the PR |
 | PR comment / PR review | `@claude` | Conversational reply — **Opus** for a submitted review, **Sonnet** for follow-up comments |
 
 The subcommand is the word immediately after `@claude`; bare `@claude` defaults to
@@ -118,10 +119,9 @@ If you leave a comment on the PR, and it is more than just a comment, tag each c
 - **Lint:** `scripts/lint` (ruff). It **rewrites files** (`ruff format` +
   `ruff check --fix`) — it is not a check-only command, so expect working-tree
   changes after it runs.
-- **Engine unit tests (no HA needed):** run from inside the tests directory so
-  `conftest.py`'s `load_module` shim is importable (`--import-mode=importlib`
-  doesn't add it to `sys.path` otherwise):
-  `cd custom_components/btoddb_ha_reminders/tests && python3 -m pytest`
+- **Engine unit tests (no HA needed):** `python3 -m pytest` (from the repo root;
+  `pytest.ini` sets `testpaths` and `conftest.py` inserts its own directory into
+  `sys.path` so `load_module` is importable regardless of working directory)
 - **Validate manifest/HACS:** `python3 -m script.hassfest` and the
   `.github/workflows/validate.yml` workflow.
 - **Hassfest locally (Docker):** `scripts/validate` runs CI's Hassfest check
