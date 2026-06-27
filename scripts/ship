@@ -5,19 +5,40 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 MANIFEST="$REPO_ROOT/custom_components/btoddb_ha_reminders/manifest.json"
 
+usage() {
+    echo "Usage: $0 [version-tag]"
+    echo "ex: $0 v1.2.3"
+    echo "If omitted, the next minor version is used from manifest.json."
+}
+
+next_minor_version() {
+    local current major minor
+
+    current=$(jq -r '.version // empty' "$MANIFEST")
+    if [[ ! "$current" =~ ^v([0-9]+)\.([0-9]+)\.[0-9]+$ ]]; then
+        echo "Error: manifest version '$current' is invalid — must be 'v' followed by exactly 3 dot-separated integers (e.g. v1.2.3)" >&2
+        exit 1
+    fi
+
+    major="${BASH_REMATCH[1]}"
+    minor="${BASH_REMATCH[2]}"
+    echo "v${major}.$((10#$minor + 1)).0"
+}
+
+if [[ $# -gt 1 ]]; then
+    usage
+    exit 1
+fi
+
 VERSION_TAG="${1:-}"
 if [[ -z "$VERSION_TAG" ]]; then
-    echo "Usage: $0 <version-tag>"
-    echo "ex: $0 v1.2.3"
-    echo
-    echo "Last 5 tags:"
-    echo
-    git tag | tail -n5
-    exit 1
+    VERSION_TAG="$(next_minor_version)"
+    echo "No version tag supplied; using next minor version: $VERSION_TAG"
 fi
 
 if [[ ! "$VERSION_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     echo "Error: version tag '$VERSION_TAG' is invalid — must be 'v' followed by exactly 3 dot-separated integers (e.g. v1.2.3)"
+    usage
     exit 1
 fi
 
