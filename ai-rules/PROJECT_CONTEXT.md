@@ -34,13 +34,16 @@ commit a diff outside `btoddb_ha_reminders`.
 - **Lint:** `scripts/lint` (ruff). It **rewrites files** (`ruff format` +
   `ruff check --fix`) — it is not a check-only command, so expect working-tree
   changes after it runs.
-- **Engine unit tests (no HA needed):** `python3 -m pytest` (runs from repo root;
-  `testpaths` in `pytest.ini` points at the tests directory automatically)
-- **Validate manifest/HACS:** hassfest runs in CI via `.github/workflows/validate.yml`
-  (not locally available). Before committing any changes to `strings.json` or
-  `translations/en.json`, manually verify: **translation strings must not contain
-  HTML** — angle-bracket syntax like `<device>` is rejected; use plain text such as
-  `DEVICE` instead.
+- **Engine unit tests (no HA needed):** `python3 -m pytest` (from the repo root;
+  `pytest.ini` sets `testpaths` and `conftest.py` inserts its own directory into
+  `sys.path` so `load_module` is importable regardless of working directory)
+- **Validate manifest/HACS:** `scripts/validate` runs CI's Hassfest check
+  (`ghcr.io/home-assistant/hassfest`) against the working tree — use it to catch
+  manifest/dependency/translation errors before pushing. Requires Docker. Also runs
+  in CI via `.github/workflows/validate.yml`. Before committing any changes to
+  `strings.json` or `translations/en.json`, manually verify: **translation strings
+  must not contain HTML** — angle-bracket syntax like `<device>` is rejected; use
+  plain text such as `DEVICE` instead.
 - **Build the card:** `scripts/deploy.sh` builds, bumps the version, and copies
   into `www/`. Edit the TypeScript source at
   `custom_components/btoddb_ha_reminders/card/src/*.ts` — never hand-edit the

@@ -8,9 +8,14 @@ The `btoddb-reminders-card` Lovelace card for the Reminders integration.
 - **Time** add row (native text `input` + native `datetime-local` input + native `<button>`)
   calls the **response-only** `btoddb_ha_reminders.create` service (`returnResponse` must be
   `true`). The message uses a styled native `<input>` rather than `ha-textfield` so it
-  always renders even where that HA element isn't loaded.
+  always renders even where that HA element isn't loaded. A **Repeat** disclosure button
+  below the row expands to a frequency selector (Daily / Weekly) and, for Weekly, a row of
+  weekday chips (Sun–Sat); these build the `rrule` param (`FREQ=DAILY` or
+  `FREQ=WEEKLY;BYDAY=<MO|TU|…>`) passed to `create` / `update`.
 - **Location** add row (native text `input` + two `ha-entity-picker`s for person/zone + a
-  native `<select>` for enter/leave + native `<button>`) calls `btoddb_ha_reminders.create_location`.
+  native `<select>` for enter/leave + native `<button>`) calls
+  `btoddb_ha_reminders.create_location`. The `persistent` flag (re-fire on every matching
+  zone transition instead of once) is exposed as a **Repeat** toggle button below the row.
 - A single merged list shows both kinds of reminder:
   - Time reminders read from the `calendar.btoddb_reminders` entity via the calendar REST
     API (`GET calendars/<entity>?start=&end=`); deleted via the `calendar/event/delete`

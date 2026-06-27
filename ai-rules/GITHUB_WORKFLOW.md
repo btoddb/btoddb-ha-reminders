@@ -11,7 +11,8 @@ fixed per phase (you do not, and cannot, switch models yourself mid-run):
 | New issue body/title, or any issue comment | `@claude plan` | **Planning only (Opus)** — posts the plan as a comment, never implements |
 | Any issue comment | `@claude implement` | **Implementation only (Sonnet)** — skips planning, implements the latest `<!-- claude:plan -->` comment and opens a PR |
 | PR comment / PR review | `@claude review` | **Line-by-line review (Opus)** — posts tagged comments; cannot change code (`contents` is read-only) |
-| PR comment / PR review | `@claude revise` | Same as **implement**, but in PRs - references review by Opus and comments for direction |
+| PR comment / PR review | `@claude revise` | **Revision (Sonnet)** — reads the review comments and implements the requested changes, then updates the PR |
+| PR comment / PR review | `@claude` | Conversational reply — **Opus** for a submitted review, **Sonnet** for follow-up comments |
 
 The subcommand is the word immediately after `@claude`; bare `@claude` defaults to
 the full pipeline. `@claude implement` bypasses the no-questions gate — it's an
