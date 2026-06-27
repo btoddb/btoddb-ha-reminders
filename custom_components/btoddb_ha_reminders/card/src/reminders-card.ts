@@ -61,6 +61,7 @@ interface LocationItem {
   person: string;
   zone: string;
   trigger: string;
+  persistent: boolean;
   deliveredAt: Date | null;
 }
 
@@ -70,6 +71,7 @@ interface LocationAttr {
   person: string;
   zone: string;
   trigger: string;
+  persistent: boolean;
   delivered_at: string | null;
 }
 
@@ -229,6 +231,7 @@ export class BtoddbRemindersCard extends LitElement {
     _locPerson: { state: true },
     _locZone: { state: true },
     _locTrigger: { state: true },
+    _locPersistent: { state: true },
     _busy: { state: true },
     _error: { state: true },
     _editingUid: { state: true },
@@ -247,6 +250,7 @@ export class BtoddbRemindersCard extends LitElement {
   private _locPerson = "";
   private _locZone = "";
   private _locTrigger = "enter";
+  private _locPersistent = false;
   private _busy = false;
   private _error = "";
   private _editingUid = "";
@@ -469,6 +473,7 @@ export class BtoddbRemindersCard extends LitElement {
           person: this._locPerson,
           zone: this._locZone,
           trigger: this._locTrigger,
+          persistent: this._locPersistent,
         });
         this._editingUid = "";
       } else {
@@ -477,12 +482,14 @@ export class BtoddbRemindersCard extends LitElement {
           person: this._locPerson,
           zone: this._locZone,
           trigger: this._locTrigger,
+          persistent: this._locPersistent,
         });
       }
       this._locMessage = "";
       this._locPerson = "";
       this._locZone = "";
       this._locTrigger = "enter";
+      this._locPersistent = false;
     } catch (err) {
       this._error = `Could not ${editingUid ? "update" : "create"} reminder: ${this._msg(err)}`;
     } finally {
@@ -521,6 +528,7 @@ export class BtoddbRemindersCard extends LitElement {
     this._locPerson = item.person;
     this._locZone = item.zone;
     this._locTrigger = item.trigger;
+    this._locPersistent = item.persistent;
     this._error = "";
   }
 
@@ -535,6 +543,7 @@ export class BtoddbRemindersCard extends LitElement {
     this._locPerson = "";
     this._locZone = "";
     this._locTrigger = "enter";
+    this._locPersistent = false;
     this._error = "";
   }
 
@@ -578,6 +587,7 @@ export class BtoddbRemindersCard extends LitElement {
       person: r.person,
       zone: r.zone,
       trigger: r.trigger,
+      persistent: r.persistent ?? false,
       deliveredAt: r.delivered_at ? new Date(r.delivered_at) : null,
     }));
   }
@@ -737,57 +747,69 @@ export class BtoddbRemindersCard extends LitElement {
   private _renderLocationAddRow() {
     const isEditing = !!this._editingUid;
     return html`
-      <div class="add-row">
-        <input
-          class="message"
-          type="text"
-          placeholder="New reminder"
-          .value=${this._locMessage}
-          @input=${(e: Event) => {
-        this._locMessage = (e.target as HTMLInputElement).value;
-      }}
-        />
-        <ha-entity-picker
-          class="picker"
-          .hass=${this.hass}
-          .value=${this._locPerson}
-          .label=${"Person"}
-          .includeDomains=${["person"]}
-          @value-changed=${(e: CustomEvent) => {
-        this._locPerson = e.detail.value as string;
-      }}
-        ></ha-entity-picker>
-        <ha-entity-picker
-          class="picker"
-          .hass=${this.hass}
-          .value=${this._locZone}
-          .label=${"Zone"}
-          .includeDomains=${["zone"]}
-          @value-changed=${(e: CustomEvent) => {
-        this._locZone = e.detail.value as string;
-      }}
-        ></ha-entity-picker>
-        <select
-          class="trigger"
-          .value=${this._locTrigger}
-          @change=${(e: Event) => {
-        this._locTrigger = (e.target as HTMLSelectElement).value;
-      }}
-        >
-          <option value="enter">Entering</option>
-          <option value="leave">Leaving</option>
-        </select>
-        ${isEditing
-        ? html`<button type="button" class="btn btn-secondary" ?disabled=${this._busy} @click=${() => this._cancelEdit()}>Cancel</button>`
-        : nothing}
-        <button
-          type="button"
-          class="btn btn-primary"
-          ?disabled=${this._busy}
-          @click=${() => this._addLocation()}
-        >
-          ${isEditing ? "Save" : "Add"}
-        </button>
+      <div>
+        <div class="add-row">
+          <input
+            class="message"
+            type="text"
+            placeholder="New reminder"
+            .value=${this._locMessage}
+            @input=${(e: Event) => {
+          this._locMessage = (e.target as HTMLInputElement).value;
+        }}
+          />
+          <ha-entity-picker
+            class="picker"
+            .hass=${this.hass}
+            .value=${this._locPerson}
+            .label=${"Person"}
+            .includeDomains=${["person"]}
+            @value-changed=${(e: CustomEvent) => {
+          this._locPerson = e.detail.value as string;
+        }}
+          ></ha-entity-picker>
+          <ha-entity-picker
+            class="picker"
+            .hass=${this.hass}
+            .value=${this._locZone}
+            .label=${"Zone"}
+            .includeDomains=${["zone"]}
+            @value-changed=${(e: CustomEvent) => {
+          this._locZone = e.detail.value as string;
+        }}
+          ></ha-entity-picker>
+          <select
+            class="trigger"
+            .value=${this._locTrigger}
+            @change=${(e: Event) => {
+          this._locTrigger = (e.target as HTMLSelectElement).value;
+        }}
+          >
+            <option value="enter">Entering</option>
+            <option value="leave">Leaving</option>
+          </select>
+          ${isEditing
+          ? html`<button type="button" class="btn btn-secondary" ?disabled=${this._busy} @click=${() => this._cancelEdit()}>Cancel</button>`
+          : nothing}
+          <button
+            type="button"
+            class="btn btn-primary"
+            ?disabled=${this._busy}
+            @click=${() => this._addLocation()}
+          >
+            ${isEditing ? "Save" : "Add"}
+          </button>
+        </div>
+        <div class="repeat-row">
+          <button
+            type="button"
+            class="repeat-toggle ${this._locPersistent ? "active" : ""}"
+            @click=${() => { this._locPersistent = !this._locPersistent; }}
+          >
+            <ha-icon icon="mdi:repeat"></ha-icon>
+            Repeat
+          </button>
+        </div>
       </div>
     `;
   }
@@ -830,10 +852,13 @@ export class BtoddbRemindersCard extends LitElement {
     )}`;
     const sub = item.deliveredAt
       ? `Delivered ${this._formatTime(item.deliveredAt)} · ${where}`
+      : item.persistent
+      ? `Repeating · ${where}`
       : where;
+    const isPersistentActive = item.persistent && !item.deliveredAt;
     return html`
-      <div class="item ${item.deliveredAt ? "delivered" : ""}">
-        <ha-icon class="leading" icon="mdi:map-marker"></ha-icon>
+      <div class="item ${isPersistentActive ? "persistent" : ""} ${item.deliveredAt ? "delivered" : ""}">
+        <ha-icon class="leading" icon=${isPersistentActive ? "mdi:map-marker-path" : "mdi:map-marker"}></ha-icon>
         <div class="text">
           <span class="summary">${item.summary}</span>
           <span class="time">${sub}</span>
@@ -1058,6 +1083,9 @@ export class BtoddbRemindersCard extends LitElement {
     .item.recurring .leading {
       color: var(--accent-color, var(--primary-color, #03a9f4));
     }
+    .item.persistent .leading {
+      color: var(--accent-color, var(--primary-color, #03a9f4));
+    }
     .time {
       color: var(--secondary-text-color, #727272);
       font-size: 12px;
@@ -1083,6 +1111,9 @@ export class BtoddbRemindersCard extends LitElement {
       font-size: 13px;
     }
     .repeat-toggle:hover {
+      color: var(--primary-color, #03a9f4);
+    }
+    .repeat-toggle.active {
       color: var(--primary-color, #03a9f4);
     }
     .repeat-body {
