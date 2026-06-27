@@ -51,6 +51,7 @@ class LocationReminderStore:
                     zone=raw["zone"],
                     trigger=raw["trigger"],
                     delivered_at=delivered_at,
+                    persistent=bool(raw.get("persistent", False)),
                 )
             )
         self.events = events
@@ -68,6 +69,7 @@ class LocationReminderStore:
                     "delivered_at": (
                         e.delivered_at.isoformat() if e.delivered_at else None
                     ),
+                    "persistent": e.persistent,
                 }
                 for e in self.events
             ],
@@ -100,7 +102,7 @@ class LocationReminderStore:
             self.events = kept
             await self._async_persist()
 
-    async def async_update_event(
+    async def async_update_event(  # noqa: PLR0913
         self,
         uid: str,
         *,
@@ -108,9 +110,16 @@ class LocationReminderStore:
         person: str | None = None,
         zone: str | None = None,
         trigger: str | None = None,
+        persistent: bool | None = None,
     ) -> bool:
         """Update a location reminder by uid and persist. Returns True if found."""
-        if summary is None and person is None and zone is None and trigger is None:
+        if (
+            summary is None
+            and person is None
+            and zone is None
+            and trigger is None
+            and persistent is None
+        ):
             return any(e.uid == uid for e in self.events)
         found = False
         updated: list[LocationReminder] = []
@@ -124,6 +133,10 @@ class LocationReminderStore:
                         person=person if person is not None else e.person,
                         zone=zone if zone is not None else e.zone,
                         trigger=trigger if trigger is not None else e.trigger,
+                        persistent=persistent
+                        if persistent is not None
+                        else e.persistent,
+                        delivered_at=None if persistent else e.delivered_at,
                     )
                 )
             else:
@@ -134,21 +147,12 @@ class LocationReminderStore:
         return found
 
     async def async_mark_delivered(self, uid: str, when: datetime) -> None:
-        """Stamp a reminder delivered (one-shot — LOC-3) and persist."""
+        """Stamp a one-shot reminder as delivered (LOC-3); skips persistent ones."""
         changed = False
         events: list[LocationReminder] = []
         for e in self.events:
-            if e.uid == uid and e.delivered_at is None:
-                events.append(
-                    LocationReminder(
-                        uid=e.uid,
-                        summary=e.summary,
-                        person=e.person,
-                        zone=e.zone,
-                        trigger=e.trigger,
-                        delivered_at=when,
-                    )
-                )
+            if e.uid == uid and e.delivered_at is None and not e.persistent:
+                events.append(dataclasses.replace(e, delivered_at=when))
                 changed = True
             else:
                 events.append(e)

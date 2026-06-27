@@ -75,6 +75,7 @@ class LocationRemindersSensor(SensorEntity):
                     "delivered_at": (
                         e.delivered_at.isoformat() if e.delivered_at else None
                     ),
+                    "persistent": e.persistent,
                 }
                 for e in self._store.events
             ],

@@ -105,7 +105,8 @@ create_location:
   name: Create location reminder
   description: >-
     Add a reminder delivered the moment a person enters or leaves a Home Assistant
-    zone. Fires once, then stays visible (crossed off) for 7 days.
+    zone. One-shot by default (fires once, then stays visible for 7 days). Set
+    persistent to true to re-fire on every matching transition instead.
   fields:
     message:
       name: Message
@@ -140,12 +141,21 @@ create_location:
           options:
             - enter
             - leave
+    persistent:
+      name: Persistent
+      description: >-
+        When true, the reminder re-fires on every matching zone transition instead
+        of firing once. It stays active until explicitly deleted.
+      required: false
+      default: false
+      selector:
+        boolean:
 
 update_location:
   name: Update location reminder
   description: >-
     Edit an existing location reminder by uid. Supply any combination of message,
-    person, zone, or trigger; at least one must be provided.
+    person, zone, trigger, or persistent; at least one must be provided.
   fields:
     uid:
       name: UID
@@ -187,6 +197,14 @@ update_location:
           options:
             - enter
             - leave
+    persistent:
+      name: Persistent
+      description: >-
+        Change whether this reminder re-fires on every transition (true) or fires
+        only once (false). Omit to leave unchanged.
+      required: false
+      selector:
+        boolean:
 
 delete_location:
   name: Delete location reminder
