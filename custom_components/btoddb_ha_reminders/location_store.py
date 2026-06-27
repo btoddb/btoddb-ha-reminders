@@ -136,6 +136,7 @@ class LocationReminderStore:
                         persistent=persistent
                         if persistent is not None
                         else e.persistent,
+                        delivered_at=None if persistent else e.delivered_at,
                     )
                 )
             else:
