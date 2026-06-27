@@ -14,6 +14,10 @@ effective_watermark = delivery.effective_watermark
 resolve_notify_target = delivery.resolve_notify_target
 advance_recurring = delivery.advance_recurring
 validate_rrule = delivery.validate_rrule
+snoozed_event = delivery.snoozed_event
+build_snooze_notify_data = delivery.build_snooze_notify_data
+SNOOZE_ACTION_PREFIX = delivery.SNOOZE_ACTION_PREFIX
+SNOOZE_TAG_PREFIX = delivery.SNOOZE_TAG_PREFIX
 
 TZ = UTC
 NOW = datetime(2026, 6, 21, 12, 0, tzinfo=TZ)
@@ -248,3 +252,104 @@ def test_advance_recurring_daily_interval_ignored_returns_none():
     # advance_recurring extracts FREQ=DAILY and advances by 1 day regardless.
     assert nxt is not None
     assert nxt.start == NOW + timedelta(days=1)
+
+
+# ---------------------------------------------------------------------------
+# snoozed_event() — one-shot copy at now + N minutes (RM-11).
+# ---------------------------------------------------------------------------
+
+
+def test_snoozed_event_start_is_now_plus_minutes():
+    event = _ev("orig", 0)
+    snoozed = snoozed_event(event, NOW, 15)
+    assert snoozed.start == NOW + timedelta(minutes=15)
+
+
+def test_snoozed_event_assigns_new_uid():
+    event = _ev("orig", 0)
+    snoozed = snoozed_event(event, NOW, 15)
+    assert snoozed.uid != event.uid
+
+
+def test_snoozed_event_uid_is_unique_across_calls():
+    event = _ev("orig", 0)
+    s1 = snoozed_event(event, NOW, 15)
+    s2 = snoozed_event(event, NOW, 15)
+    assert s1.uid != s2.uid
+
+
+def test_snoozed_event_preserves_summary():
+    event = ReminderEvent(uid="u", summary="take medicine", start=NOW)
+    snoozed = snoozed_event(event, NOW, 30)
+    assert snoozed.summary == "take medicine"
+
+
+def test_snoozed_event_clears_rrule():
+    event = ReminderEvent(uid="r", summary="s", start=NOW, rrule="FREQ=DAILY")
+    snoozed = snoozed_event(event, NOW, 15)
+    assert snoozed.rrule is None
+
+
+def test_snoozed_event_one_shot_has_no_rrule():
+    event = _ev("orig", 0)
+    snoozed = snoozed_event(event, NOW, 60)
+    assert snoozed.rrule is None
+
+
+# ---------------------------------------------------------------------------
+# build_snooze_notify_data() — actionable notification payload (RM-10).
+# ---------------------------------------------------------------------------
+
+
+def test_build_snooze_notify_data_tag():
+    data = build_snooze_notify_data("uid123", [15, 60])
+    assert data["tag"] == f"{SNOOZE_TAG_PREFIX}__uid123"
+
+
+def test_build_snooze_notify_data_action_count():
+    # 2 snooze durations + 1 OK button = 3 actions total
+    data = build_snooze_notify_data("uid123", [15, 60])
+    assert len(data["actions"]) == 3
+
+
+def test_build_snooze_notify_data_action_ids():
+    data = build_snooze_notify_data("uid123", [15])
+    action_ids = [a["action"] for a in data["actions"]]
+    assert f"{SNOOZE_ACTION_PREFIX}__uid123__15" in action_ids
+
+
+def test_build_snooze_notify_data_ok_button_present():
+    data = build_snooze_notify_data("uid123", [15])
+    ok_actions = [a for a in data["actions"] if a["title"] == "OK"]
+    assert len(ok_actions) == 1
+
+
+def test_build_snooze_notify_data_minute_label():
+    data = build_snooze_notify_data("u", [15])
+    titles = [a["title"] for a in data["actions"]]
+    assert "Snooze 15 min" in titles
+
+
+def test_build_snooze_notify_data_hour_label():
+    data = build_snooze_notify_data("u", [60])
+    titles = [a["title"] for a in data["actions"]]
+    assert "Snooze 1h" in titles
+
+
+def test_build_snooze_notify_data_two_hour_label():
+    data = build_snooze_notify_data("u", [120])
+    titles = [a["title"] for a in data["actions"]]
+    assert "Snooze 2h" in titles
+
+
+def test_build_snooze_notify_data_non_round_hour_uses_minutes():
+    # 90 minutes is not a round hour so it stays as minutes
+    data = build_snooze_notify_data("u", [90])
+    titles = [a["title"] for a in data["actions"]]
+    assert "Snooze 90 min" in titles
+
+
+def test_build_snooze_notify_data_empty_durations_only_ok():
+    data = build_snooze_notify_data("u", [])
+    assert len(data["actions"]) == 1
+    assert data["actions"][0]["title"] == "OK"

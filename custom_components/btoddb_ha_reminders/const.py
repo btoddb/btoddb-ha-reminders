@@ -7,6 +7,7 @@ DOMAIN = "btoddb_ha_reminders"
 # Config / option keys.
 CONF_NOTIFY_SERVICE = "notify_service"
 CONF_CALENDAR_NAME = "calendar_name"
+CONF_SNOOZE_DURATIONS = "snooze_durations"
 # Reserved for a future option (pick an existing calendar vs. component-created).
 # v1 is fixed to "internal" — see store.py, which is the swap seam.
 CONF_CALENDAR_SOURCE = "calendar_source"
@@ -15,6 +16,8 @@ CONF_CALENDAR_SOURCE = "calendar_source"
 # shareable; this HA configures it to notify.btoddb (see README + migration).
 DEFAULT_NOTIFY_SERVICE = "notify.notify"
 DEFAULT_CALENDAR_NAME = "BToddB Reminders"
+# Snooze durations shown as action buttons on time-based notifications (RM-12).
+DEFAULT_SNOOZE_DURATIONS: list[int] = [15, 60]
 CALENDAR_SOURCE_INTERNAL = "internal"
 
 # Notification presentation (RM-6): high-priority push so Android delivers immediately

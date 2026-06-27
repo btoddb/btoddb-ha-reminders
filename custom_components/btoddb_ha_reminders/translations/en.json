@@ -23,10 +23,12 @@
       "init": {
         "title": "BToddB Reminders",
         "data": {
-          "notify_service": "Notify service"
+          "notify_service": "Notify service",
+          "snooze_durations": "Snooze durations"
         },
         "data_description": {
-          "notify_service": "Pick the notify service to push due reminders to (e.g. notify.persistent_notification, notify.mobile_app_DEVICE, or a notify group). See the README Configure section."
+          "notify_service": "Pick the notify service to push due reminders to (e.g. notify.persistent_notification, notify.mobile_app_DEVICE, or a notify group). See the README Configure section.",
+          "snooze_durations": "Comma-separated snooze durations in minutes (e.g. \"15, 60\"). These appear as snooze action buttons on delivered time-based notifications (HA Companion mobile app only)."
         }
       }
     }
@@ -109,6 +111,20 @@
         "uid": {
           "name": "UID",
           "description": "The unique id of the location reminder to delete."
+        }
+      }
+    },
+    "snooze": {
+      "name": "Snooze reminder",
+      "description": "Reschedule a time-based reminder to fire again after a delay.",
+      "fields": {
+        "uid": {
+          "name": "UID",
+          "description": "The unique id of the reminder to snooze."
+        },
+        "minutes": {
+          "name": "Minutes",
+          "description": "How many minutes to delay the re-delivery."
         }
       }
     }

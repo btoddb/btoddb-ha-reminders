@@ -24,8 +24,10 @@ from homeassistant.helpers import selector
 from .const import (
     CONF_CALENDAR_NAME,
     CONF_NOTIFY_SERVICE,
+    CONF_SNOOZE_DURATIONS,
     DEFAULT_CALENDAR_NAME,
     DEFAULT_NOTIFY_SERVICE,
+    DEFAULT_SNOOZE_DURATIONS,
     DOMAIN,
 )
 
@@ -69,11 +71,40 @@ def _user_schema(
     )
 
 
-def _options_schema(hass: HomeAssistant, default_notify: str) -> vol.Schema:
+def _snooze_durations_to_str(durations: list[int]) -> str:
+    """Convert a list of snooze durations to a comma-separated display string."""
+    return ", ".join(str(d) for d in durations)
+
+
+def _coerce_snooze_durations(value: object) -> list[int]:
+    """Validate and coerce a comma-separated string or list to ``list[int]``."""
+    if isinstance(value, list):
+        result = [int(v) for v in value]
+    elif isinstance(value, str):
+        result = [int(v.strip()) for v in value.split(",") if v.strip()]
+    else:
+        msg = f"Expected string or list, got {type(value).__name__}"
+        raise vol.Invalid(msg)
+    if not result:
+        msg = "Enter at least one snooze duration in minutes."
+        raise vol.Invalid(msg)
+    if any(v < 1 for v in result):
+        msg = "All snooze durations must be at least 1 minute."
+        raise vol.Invalid(msg)
+    return result
+
+
+def _options_schema(
+    hass: HomeAssistant, default_notify: str, default_snooze: str
+) -> vol.Schema:
     return vol.Schema(
         {
             vol.Required(CONF_NOTIFY_SERVICE, default=default_notify): _notify_selector(
                 hass, default_notify
+            ),
+            vol.Required(CONF_SNOOZE_DURATIONS, default=default_snooze): vol.All(
+                selector.TextSelector(),
+                _coerce_snooze_durations,
             ),
         }
     )
@@ -113,12 +144,20 @@ class RemindersOptionsFlow(OptionsFlow):
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Handle the (only) options step: change the notify target."""
+        """Handle the (only) options step: change notify target and snooze durations."""
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
-        current = self.config_entry.options.get(
+        current_notify = self.config_entry.options.get(
             CONF_NOTIFY_SERVICE
         ) or self.config_entry.data.get(CONF_NOTIFY_SERVICE, DEFAULT_NOTIFY_SERVICE)
+        current_durations: list[int] = self.config_entry.options.get(
+            CONF_SNOOZE_DURATIONS
+        ) or self.config_entry.data.get(CONF_SNOOZE_DURATIONS, DEFAULT_SNOOZE_DURATIONS)
         return self.async_show_form(
-            step_id="init", data_schema=_options_schema(self.hass, current)
+            step_id="init",
+            data_schema=_options_schema(
+                self.hass,
+                current_notify,
+                _snooze_durations_to_str(current_durations),
+            ),
         )
