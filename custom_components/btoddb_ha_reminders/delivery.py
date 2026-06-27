@@ -9,8 +9,15 @@ events, decide which ones are now due.
 from __future__ import annotations
 
 import dataclasses
+import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+
+# Action ID prefix embedded in mobile notification snooze buttons (RM-13).
+# Format: BTODDB_HA_REMINDERS_SNOOZE__{uid}__{minutes}
+SNOOZE_ACTION_PREFIX = "BTODDB_HA_REMINDERS_SNOOZE"
+# Notification tag prefix for per-reminder deduplication (RM-10).
+SNOOZE_TAG_PREFIX = "BTODDB_HA_REMINDERS"
 
 # Catch-up window is clamped to at most 6h in the past (RM-7b): a lost, corrupted, or
 # never-initialized watermark can't flood the phone with a backlog of old reminders.
@@ -158,3 +165,54 @@ def resolve_notify_target(configured: str) -> tuple[str, str]:
     """Parse ``domain.service`` into ``(domain, service)``."""
     domain, _, service = configured.partition(".")
     return (domain or "notify"), (service or "notify")
+
+
+def snoozed_event(
+    original: ReminderEvent, now: datetime, minutes: int
+) -> ReminderEvent:
+    """
+    Return a new one-shot copy of ``original`` set to fire ``minutes`` after ``now``.
+
+    The summary is preserved; a fresh uid is assigned so both events are independent
+    in the store.  rrule is always cleared — fires exactly once (RM-11).
+    """
+    return ReminderEvent(
+        uid=uuid.uuid4().hex,
+        summary=original.summary,
+        start=now + timedelta(minutes=minutes),
+        rrule=None,
+    )
+
+
+_MINUTES_PER_HOUR = 60
+
+
+def _snooze_button_label(minutes: int) -> str:
+    """Short human-readable label for a snooze action button."""
+    if minutes >= _MINUTES_PER_HOUR and minutes % _MINUTES_PER_HOUR == 0:
+        return f"Snooze {minutes // _MINUTES_PER_HOUR}h"
+    return f"Snooze {minutes} min"
+
+
+def build_snooze_notify_data(
+    uid: str, snooze_durations: list[int]
+) -> dict[str, object]:
+    """
+    Build the ``data`` additions for an actionable snooze notification (RM-10).
+
+    Returns a dict with ``tag`` and ``actions`` to merge into the base NOTIFY_DATA.
+    The ``actions`` / ``tag`` keys are honoured only by the HA Companion mobile app;
+    other notify targets silently ignore them (RM-15).
+    """
+    actions: list[dict[str, str]] = [
+        {
+            "action": f"{SNOOZE_ACTION_PREFIX}__{uid}__{minutes}",
+            "title": _snooze_button_label(minutes),
+        }
+        for minutes in snooze_durations
+    ]
+    actions.append({"action": f"BTODDB_HA_REMINDERS_OK__{uid}", "title": "OK"})
+    return {
+        "tag": f"{SNOOZE_TAG_PREFIX}__{uid}",
+        "actions": actions,
+    }

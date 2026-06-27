@@ -106,14 +106,14 @@ def _reminder(persistent=False):
 
 def test_send_notification_returns_true_on_success():
     hass = _FakeHass(fail=False)
-    ok = asyncio.run(pkg.async_send_notification(hass, "notify", "foo", "t", "m"))
+    ok = asyncio.run(pkg.async_send_notification(hass, ("notify", "foo"), "t", "m"))
     assert ok is True
     assert len(hass.services.calls) == 1
 
 
 def test_send_notification_returns_false_when_notify_raises():
     hass = _FakeHass(fail=True)
-    ok = asyncio.run(pkg.async_send_notification(hass, "notify", "foo", "t", "m"))
+    ok = asyncio.run(pkg.async_send_notification(hass, ("notify", "foo"), "t", "m"))
     assert ok is False
     assert len(hass.services.calls) == 1  # it tried
 

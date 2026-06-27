@@ -101,6 +101,31 @@ update:
       selector:
         text:
 
+snooze:
+  name: Snooze reminder
+  description: >-
+    Reschedule a time-based reminder to fire again after a delay. Creates a new
+    one-shot copy of the original reminder set to fire in the given number of minutes.
+    The original recurring series (if any) is unaffected (RM-11).
+  fields:
+    uid:
+      name: UID
+      description: The unique id of the reminder to snooze.
+      required: true
+      example: 1a2b3c4d
+      selector:
+        text:
+    minutes:
+      name: Minutes
+      description: How many minutes to delay the re-delivery.
+      required: true
+      example: 15
+      selector:
+        number:
+          min: 1
+          mode: box
+          unit_of_measurement: minutes
+
 create_location:
   name: Create location reminder
   description: >-

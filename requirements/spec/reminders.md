@@ -116,3 +116,32 @@ mirroring how it already watches the calendar entity.
 **LOC-out.** Non-zone locations (raw addresses) and a conversation-agent function for
 creating location reminders are out of scope for now; `zone` is stored as an entity_id
 string so an address-backed source can slot in later without reshaping the model.
+
+## Snooze (time-based reminders)
+
+**RM-10.** Every delivered time-based notification includes **actionable snooze buttons**
+alongside an OK button via `data.actions` (HA Companion mobile app format). The
+`data.tag` field is set per-reminder uid so that a re-delivered snooze replaces the
+notification if the device is still showing it.
+
+**RM-11.** A snooze creates a **new one-shot reminder** set to fire `minutes` after the
+moment the snooze action fires. The new event gets a fresh uid and no rrule. The original
+recurring series (if any) is unaffected: the recurring event has already been rolled
+forward to its next occurrence before the notification was sent.
+
+**RM-12.** Snooze durations are **configurable** in the integration Options, defaulting
+to `[15, 60]` (15 min and 1 hour). The configured values appear as buttons on every
+delivered time-based notification.
+
+**RM-13 (constraint).** The `mobile_app_notification_action` event listener is
+**action-namespaced**: it only acts on action ids prefixed with
+`BTODDB_HA_REMINDERS_SNOOZE__`, ignoring all others so unrelated integrations' button
+taps are never processed.
+
+**RM-14.** Snooze is callable as a first-class HA service (`btoddb_ha_reminders.snooze`,
+fields `uid` + `minutes`). The notification action listener delegates to this service.
+The service can also be invoked directly from automations, scripts, or the dashboard card.
+
+**RM-15 (constraint).** The `data.actions` / `data.tag` keys are honoured only by the
+HA Companion mobile app. For `notify.persistent_notification` or notify groups the keys
+are silently ignored — no regression for non-mobile users.

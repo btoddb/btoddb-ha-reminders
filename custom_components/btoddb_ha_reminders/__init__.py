@@ -48,8 +48,10 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_NOTIFY_SERVICE,
+    CONF_SNOOZE_DURATIONS,
     DATA_LOCATION_STORE,
     DATA_STORE,
+    DEFAULT_SNOOZE_DURATIONS,
     DELIVERY_INTERVAL_MINUTES,
     DOMAIN,
     LOCATION_RETENTION_DAYS,
@@ -59,11 +61,14 @@ from .const import (
 )
 from .delivery import (
     CATCHUP_FLOOR,
+    SNOOZE_ACTION_PREFIX,
     ReminderEvent,
     advance_recurring,
+    build_snooze_notify_data,
     due_events,
     effective_watermark,
     resolve_notify_target,
+    snoozed_event,
     validate_rrule,
 )
 from .location import LocationReminder, transition_kind, triggered
@@ -93,10 +98,12 @@ _CARD_STATIC_PATH_KEY = f"{DOMAIN}_card_static_path"
 
 SERVICE_CREATE = "create"
 SERVICE_UPDATE = "update"
+SERVICE_SNOOZE = "snooze"
 ATTR_MESSAGE = "message"
 ATTR_WHEN = "when"
 ATTR_IN_MINUTES = "in_minutes"
 ATTR_RRULE = "rrule"
+ATTR_MINUTES = "minutes"
 
 SERVICE_CREATE_LOCATION = "create_location"
 SERVICE_UPDATE_LOCATION = "update_location"
@@ -107,6 +114,9 @@ ATTR_TRIGGER = "trigger"
 ATTR_UID = "uid"
 ATTR_PERSISTENT = "persistent"
 TRIGGER_VALUES = ("enter", "leave")
+
+# HA Companion app fires this event when a notification action button is tapped.
+_EVENT_MOBILE_APP_NOTIFICATION_ACTION = "mobile_app_notification_action"
 
 
 def _optional_minutes(value: object) -> int | None:
@@ -167,6 +177,13 @@ UPDATE_LOCATION_SCHEMA = vol.Schema(
 
 DELETE_LOCATION_SCHEMA = vol.Schema({vol.Required(ATTR_UID): cv.string})
 
+SNOOZE_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_UID): cv.string,
+        vol.Required(ATTR_MINUTES): vol.All(vol.Coerce(int), vol.Range(min=1)),
+    }
+)
+
 # Keep pruned history a day past the catch-up floor so the calendar can still show the
 # most recent fired reminders without growing unbounded.
 PRUNE_RETENTION = CATCHUP_FLOOR + timedelta(days=1)
@@ -178,7 +195,11 @@ LOCATION_PRUNE_INTERVAL_HOURS = 1
 
 
 async def async_send_notification(
-    hass: HomeAssistant, domain: str, service: str, title: str, message: str
+    hass: HomeAssistant,
+    notify_target: tuple[str, str],
+    title: str,
+    message: str,
+    extra_data: dict[str, object] | None = None,
 ) -> bool:
     """
     Push one reminder to the notify target (shared by time + location delivery).
@@ -187,12 +208,19 @@ async def async_send_notification(
     caught and logged so a single failed delivery never aborts the rest of a delivery
     pass; the boolean lets the caller decide whether to record the reminder as delivered
     (a location reminder must not be crossed off if it never reached the user).
+
+    ``extra_data`` is merged into the base NOTIFY_DATA for snooze action buttons and a
+    notification tag on time-based reminders (RM-10).  Pass ``None`` (default) to omit.
     """
+    domain, service = notify_target
     try:
+        data: dict[str, object] = dict(NOTIFY_DATA)
+        if extra_data:
+            data.update(extra_data)
         await hass.services.async_call(
             domain,
             service,
-            {"title": title, "message": message, "data": dict(NOTIFY_DATA)},
+            {"title": title, "message": message, "data": data},
             blocking=True,
         )
     except Exception:
@@ -246,7 +274,40 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     _async_register_service(hass, store)
+    _async_register_snooze_service(hass, store)
     _async_register_location_services(hass, location_store)
+
+    async def _async_handle_notification_action(event: Event) -> None:
+        """Forward mobile snooze button taps to the snooze service (RM-14)."""
+        action: str = event.data.get("action", "")
+        if not action.startswith(f"{SNOOZE_ACTION_PREFIX}__"):
+            return
+        parts = action.split("__")
+        if len(parts) != 3:  # noqa: PLR2004
+            _LOGGER.debug("Ignoring malformed snooze action id %r", action)
+            return
+        uid, minutes_str = parts[1], parts[2]
+        try:
+            minutes = int(minutes_str)
+        except ValueError:
+            _LOGGER.debug("Ignoring snooze action with non-integer minutes: %r", action)
+            return
+        try:
+            await hass.services.async_call(
+                DOMAIN,
+                SERVICE_SNOOZE,
+                {ATTR_UID: uid, ATTR_MINUTES: minutes},
+                blocking=True,
+            )
+        except Exception:
+            _LOGGER.exception("Failed to handle snooze action for uid=%r", uid)
+
+    entry.async_on_unload(
+        hass.bus.async_listen(
+            _EVENT_MOBILE_APP_NOTIFICATION_ACTION,
+            _async_handle_notification_action,
+        )
+    )
 
     delivery = ReminderDelivery(hass, entry, store)
     entry.async_on_unload(
@@ -363,6 +424,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if not hass.data[DOMAIN]:
             hass.services.async_remove(DOMAIN, SERVICE_CREATE)
             hass.services.async_remove(DOMAIN, SERVICE_UPDATE)
+            hass.services.async_remove(DOMAIN, SERVICE_SNOOZE)
             hass.services.async_remove(DOMAIN, SERVICE_CREATE_LOCATION)
             hass.services.async_remove(DOMAIN, SERVICE_UPDATE_LOCATION)
             hass.services.async_remove(DOMAIN, SERVICE_DELETE_LOCATION)
@@ -489,6 +551,30 @@ def _async_register_service(hass: HomeAssistant, store: ReminderStore) -> None:
 
 
 @callback
+def _async_register_snooze_service(hass: HomeAssistant, store: ReminderStore) -> None:
+    """Register ``btoddb_ha_reminders.snooze`` (idempotent)."""
+    if hass.services.has_service(DOMAIN, SERVICE_SNOOZE):
+        return
+
+    async def _handle_snooze(call: ServiceCall) -> None:
+        uid: str = call.data[ATTR_UID]
+        minutes: int = call.data[ATTR_MINUTES]
+        now = dt_util.now()
+        original = next((e for e in store.events if e.uid == uid), None)
+        if original is None:
+            msg = f"Reminder with uid {uid!r} not found."
+            raise ServiceValidationError(msg)
+        await store.async_add_event(snoozed_event(original, now, minutes))
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SNOOZE,
+        _handle_snooze,
+        schema=SNOOZE_SCHEMA,
+    )
+
+
+@callback
 def _async_register_location_services(
     hass: HomeAssistant, store: LocationReminderStore
 ) -> None:
@@ -577,11 +663,20 @@ class ReminderDelivery:
         """One delivery pass over the ``(watermark, now]`` window (RM-6/RM-7)."""
         now = dt_util.now()
         watermark = effective_watermark(self._store.watermark, now)
-        domain, service = _notify_target_for(self._entry)
+        notify_target = _notify_target_for(self._entry)
+        snooze_durations: list[int] = (
+            self._entry.options.get(CONF_SNOOZE_DURATIONS)
+            or self._entry.data.get(CONF_SNOOZE_DURATIONS)
+            or DEFAULT_SNOOZE_DURATIONS
+        )
 
         for event in due_events(self._store.events, watermark, now):
             await async_send_notification(
-                self._hass, domain, service, NOTIFY_TITLE, event.summary
+                self._hass,
+                notify_target,
+                NOTIFY_TITLE,
+                event.summary,
+                extra_data=build_snooze_notify_data(event.uid, snooze_durations),
             )
             next_event = advance_recurring(event, now)
             if next_event is not None:
@@ -677,7 +772,7 @@ class LocationDelivery:
             by_zone.setdefault(reminder.zone, []).append(reminder)
 
         now = dt_util.now()
-        domain, service = _notify_target_for(self._entry)
+        notify_target = _notify_target_for(self._entry)
         for zone, reminders in by_zone.items():
             kind = transition_kind(old_state, new_state, _zone_value(self._hass, zone))
             if kind is None:
@@ -690,8 +785,7 @@ class LocationDelivery:
                 if (
                     await async_send_notification(
                         self._hass,
-                        domain,
-                        service,
+                        notify_target,
                         NOTIFY_TITLE_LOCATION,
                         reminder.summary,
                     )
