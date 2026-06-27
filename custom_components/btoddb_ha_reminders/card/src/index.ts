@@ -9,7 +9,7 @@
 
 import "./reminders-card";
 
-const VERSION = "v0.0.39";
+const VERSION = "v0.0.40";
 
 console.info(
   `%c BTODDB-HA-REMINDERS %c ${VERSION} `,

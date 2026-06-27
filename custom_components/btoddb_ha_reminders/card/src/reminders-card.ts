@@ -618,6 +618,42 @@ export class BtoddbRemindersCard extends LitElement {
     }
   }
 
+  private _formatTimeOnly(d: Date): string {
+    try {
+      return d.toLocaleString(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+      });
+    } catch {
+      return d.toLocaleString();
+    }
+  }
+
+  private _dayKey(d: Date): string {
+    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  }
+
+  private _formatDayHeader(d: Date): string {
+    const today = new Date();
+    if (this._dayKey(d) === this._dayKey(today)) return "Today";
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+    if (this._dayKey(d) === this._dayKey(tomorrow)) return "Tomorrow";
+    try {
+      return d.toLocaleDateString(undefined, {
+        weekday: "long",
+        month: "short",
+        day: "numeric",
+      });
+    } catch {
+      return d.toLocaleDateString();
+    }
+  }
+
+  private _renderDayHeader(d: Date) {
+    return html`<div class="day-header">${this._formatDayHeader(d)}</div>`;
+  }
+
   /** Human-readable recurrence string, e.g. "Every day at 9:45 AM". */
   private _formatRecurrence(rrule: string, start: Date): string {
     const time = start.toLocaleString(undefined, {
@@ -814,13 +850,28 @@ export class BtoddbRemindersCard extends LitElement {
     `;
   }
 
-  private _renderTimeItem(item: TimeItem) {
+  private _renderTimeRows() {
+    const rows = [];
+    let lastKey = "";
+    for (const item of this._items) {
+      const key = this._dayKey(item.start);
+      const dayFirst = key !== lastKey;
+      if (dayFirst) {
+        rows.push(this._renderDayHeader(item.start));
+        lastKey = key;
+      }
+      rows.push(this._renderTimeItem(item, dayFirst));
+    }
+    return rows;
+  }
+
+  private _renderTimeItem(item: TimeItem, dayFirst = false) {
     const isRecurring = !!item.rrule;
     const sub = isRecurring
       ? this._formatRecurrence(item.rrule, item.start)
-      : this._formatTime(item.start);
+      : this._formatTimeOnly(item.start);
     return html`
-      <div class="item ${isRecurring ? "recurring" : ""}">
+      <div class="item ${isRecurring ? "recurring" : ""} ${dayFirst ? "day-first" : ""}">
         <ha-icon
           class="leading"
           icon=${isRecurring ? "mdi:repeat" : "mdi:alarm"}
@@ -923,7 +974,7 @@ export class BtoddbRemindersCard extends LitElement {
         ? html`<div class="empty">No reminders.</div>`
         : html`
                 <div class="list">
-                  ${this._items.map((item) => this._renderTimeItem(item))}
+                  ${this._renderTimeRows()}
                   ${locUndelivered.map((item) =>
           this._renderLocationItem(item),
         )}
@@ -1055,6 +1106,24 @@ export class BtoddbRemindersCard extends LitElement {
       border-top: 1px solid var(--divider-color, #e0e0e0);
     }
     .item:first-child {
+      border-top: none;
+    }
+    .day-header {
+      color: var(--secondary-text-color, #727272);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 8px 0 2px;
+      margin-top: 4px;
+      border-top: 1px solid var(--divider-color, #e0e0e0);
+    }
+    .list > .day-header:first-child {
+      border-top: none;
+      margin-top: 0;
+      padding-top: 4px;
+    }
+    .item.day-first {
       border-top: none;
     }
     .leading {
