@@ -51,6 +51,7 @@ days: 14
 hide_end_time: auto
 show_calendar_name: auto
 max_items: 0
+dashboard_path: /calendar?view=dayGridMonth
 ```
 
 - Fetches each configured calendar from the HA calendar REST API
@@ -65,6 +66,8 @@ max_items: 0
 - `show_calendar_name` supports `auto` (show only when more than one calendar is configured),
   `always`, or `never`.
 - `max_items: 0` means unlimited. The default look-ahead window is 14 days.
+- Clicking anywhere on the agenda opens `dashboard_path`; blank/unset defaults to
+  `/calendar?view=dayGridMonth`.
 - String entries under `entities` are preferred, but object entries with
   `hide_end_time: true|false|auto|always|never` are accepted for compatibility with earlier
   plan drafts.
