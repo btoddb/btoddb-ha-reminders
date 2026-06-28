@@ -45,6 +45,7 @@ interface CalendarEvent {
 
 interface CalendarEntry {
   uid: string;
+  dedupeKey: string;
   summary: string;
   start: Date;
   end: Date | null;
@@ -138,6 +139,16 @@ function minDate(a: Date, b: Date): Date {
 function lastOverlappingDate(start: Date, end: Date | null): Date {
   if (!end || end.getTime() <= start.getTime()) return start;
   return new Date(end.getTime() - 1);
+}
+
+function dedupeEntries(entries: CalendarEntry[]): CalendarEntry[] {
+  const seen = new Set<string>();
+  return entries.filter((entry) => {
+    const key = `${entry.dedupeKey}|${dayKey(entry.displayDate)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 export class BtoddbCalendarListCardEditor extends LitElement {
@@ -550,6 +561,8 @@ export class BtoddbCalendarListCard extends LitElement {
           return a.summary.localeCompare(b.summary);
         });
 
+      entries = dedupeEntries(entries);
+
       const maxItems = this._maxItems();
       if (maxItems > 0) entries = entries.slice(0, maxItems);
 
@@ -582,8 +595,18 @@ export class BtoddbCalendarListCard extends LitElement {
         const uid =
           event.uid ??
           `${calendarConfig.entity}-${start.toISOString()}-${event.summary ?? index}`;
+        const dedupeKey = event.uid
+          ? `${calendarConfig.entity}|uid:${event.uid}`
+          : [
+              calendarConfig.entity,
+              "event",
+              event.summary || "(No title)",
+              start.toISOString(),
+              end?.toISOString() ?? "",
+            ].join("|");
         const baseEntry = {
           uid,
+          dedupeKey,
           summary: event.summary || "(No title)",
           start,
           end,
