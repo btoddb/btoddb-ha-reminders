@@ -1,8 +1,8 @@
 # Card — CLAUDE.md
 
-The `btoddb-reminders-card` Lovelace card for the Reminders integration.
+The Lovelace cards for the Reminders integration.
 
-## What it does
+## `btoddb-reminders-card`
 
 - A **Time / Location** tab toggle picks which add-row shows.
 - **Time** add row (native text `input` + native `datetime-local` input + native `<button>`)
@@ -26,9 +26,51 @@ The `btoddb-reminders-card` Lovelace card for the Reminders integration.
 - The list refreshes when the calendar entity's `last_updated` changes (add / fire /
   delete) and once a minute (so times stay fresh and fired reminders drop off); location
   rows re-render on any `hass` update since they read from entity state.
+- After a time reminder create/update/delete, the card emits a browser-local change event
+  so any `btoddb-calendar-list-card` on the same dashboard can refresh without waiting for
+  Home Assistant's next entity update or the minute timer.
 
 It is built from **stock HA web components** (`ha-card`, `ha-icon`, `ha-icon-button`)
 plus native `<input>`s, native `<button>`s, and Lit — no `custom-card-helpers`.
+
+## `btoddb-calendar-list-card`
+
+Read-only agenda/list card for one or more Home Assistant calendar entities. It is
+intended for viewing reminders alongside other events; creation, editing, and deletion
+remain in `btoddb-reminders-card`.
+
+Example config:
+
+```yaml
+type: custom:btoddb-calendar-list-card
+title: Agenda
+entities:
+  - calendar.btoddb_reminders
+  - calendar.family
+days: 14
+hide_end_time: auto
+show_calendar_name: auto
+max_items: 0
+```
+
+- Fetches each configured calendar from the HA calendar REST API
+  (`GET calendars/<entity>?start=&end=`), merges results, sorts chronologically, and groups
+  by local day, expanding multi-day events into one visible agenda row per day.
+- When a `btoddb-reminders-card` on the same dashboard changes a configured reminder
+  calendar, the agenda does an immediate refresh plus short retries so recurring reminders
+  appear as soon as the calendar API reflects them.
+- Skips empty days because day headers are emitted only for days with entries.
+- `hide_end_time` supports `auto` (default), `always`, or `never`; `auto` hides the end for
+  all-day entries and point-in-time entries with duration of 1 minute or less.
+- `show_calendar_name` supports `auto` (show only when more than one calendar is configured),
+  `always`, or `never`.
+- `max_items: 0` means unlimited. The default look-ahead window is 14 days.
+- String entries under `entities` are preferred, but object entries with
+  `hide_end_time: true|false|auto|always|never` are accepted for compatibility with earlier
+  plan drafts.
+
+Both cards compile into the single `btoddb-ha-reminders.js` bundle and are registered from
+`src/index.ts`.
 
 ## Source / build / deploy
 

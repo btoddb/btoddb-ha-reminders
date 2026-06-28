@@ -7,9 +7,10 @@
 // The version string below is bumped automatically by scripts/deploy.sh (it greps
 // for the first `vX.Y.Z`), so you can confirm in the console which build loaded.
 
+import "./calendar-list-card";
 import "./reminders-card";
 
-const VERSION = "v0.0.41";
+const VERSION = "v0.0.47";
 
 console.info(
   `%c BTODDB-HA-REMINDERS %c ${VERSION} `,
@@ -23,6 +24,13 @@ window.customCards.push({
   type: "btoddb-reminders-card",
   name: "BToddB Reminders",
   description: "Create reminders and see the upcoming ones.",
+  preview: false,
+  documentationURL: "https://github.com/btoddb/btoddb-ha-reminders",
+});
+window.customCards.push({
+  type: "btoddb-calendar-list-card",
+  name: "BToddB Calendar List",
+  description: "Show calendars and reminders as a compact agenda.",
   preview: false,
   documentationURL: "https://github.com/btoddb/btoddb-ha-reminders",
 });
