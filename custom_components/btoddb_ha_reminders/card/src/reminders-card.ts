@@ -76,6 +76,7 @@ interface LocationAttr {
 }
 
 const DEFAULT_ENTITY = "calendar.btoddb_reminders";
+const REMINDERS_CHANGED_EVENT = "btoddb-ha-reminders-reminders-changed";
 // Default entity_id of the location-reminders sensor. Used as a fallback only — the
 // sensor is normally found by its marker attribute so a registry rename can't hide it.
 const LOCATION_SENSOR_DEFAULT = "sensor.btoddb_location_reminders";
@@ -374,6 +375,14 @@ export class BtoddbRemindersCard extends LitElement {
     return toLocalInput(d);
   }
 
+  private _notifyTimeRemindersChanged(): void {
+    window.dispatchEvent(
+      new CustomEvent(REMINDERS_CHANGED_EVENT, {
+        detail: { entity: this._entity },
+      }),
+    );
+  }
+
   private async _add(): Promise<void> {
     const message = this._message.trim();
     if (!message) {
@@ -427,6 +436,7 @@ export class BtoddbRemindersCard extends LitElement {
       this._freq = "daily";
       this._weekday = "MO";
       await this._fetch();
+      this._notifyTimeRemindersChanged();
     } catch (err) {
       this._error = `Could not ${editingUid ? "update" : "create"} reminder: ${this._msg(err)}`;
     } finally {
@@ -443,6 +453,7 @@ export class BtoddbRemindersCard extends LitElement {
         uid,
       });
       this._items = this._items.filter((i) => i.uid !== uid);
+      this._notifyTimeRemindersChanged();
     } catch (err) {
       this._error = `Could not delete reminder: ${this._msg(err)}`;
     }

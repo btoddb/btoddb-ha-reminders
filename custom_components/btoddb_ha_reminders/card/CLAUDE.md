@@ -26,6 +26,9 @@ The Lovelace cards for the Reminders integration.
 - The list refreshes when the calendar entity's `last_updated` changes (add / fire /
   delete) and once a minute (so times stay fresh and fired reminders drop off); location
   rows re-render on any `hass` update since they read from entity state.
+- After a time reminder create/update/delete, the card emits a browser-local change event
+  so any `btoddb-calendar-list-card` on the same dashboard can refresh without waiting for
+  Home Assistant's next entity update or the minute timer.
 
 It is built from **stock HA web components** (`ha-card`, `ha-icon`, `ha-icon-button`)
 plus native `<input>`s, native `<button>`s, and Lit — no `custom-card-helpers`.
@@ -53,6 +56,9 @@ max_items: 0
 - Fetches each configured calendar from the HA calendar REST API
   (`GET calendars/<entity>?start=&end=`), merges results, sorts chronologically, and groups
   by local day, expanding multi-day events into one visible agenda row per day.
+- When a `btoddb-reminders-card` on the same dashboard changes a configured reminder
+  calendar, the agenda does an immediate refresh plus short retries so recurring reminders
+  appear as soon as the calendar API reflects them.
 - Skips empty days because day headers are emitted only for days with entries.
 - `hide_end_time` supports `auto` (default), `always`, or `never`; `auto` hides the end for
   all-day entries and point-in-time entries with duration of 1 minute or less.

@@ -60,6 +60,7 @@ const DEFAULT_ENTITY = "calendar.btoddb_reminders";
 const DEFAULT_DAYS = 14;
 const MAX_DAYS = 365;
 const POINT_EVENT_MS = 60_000;
+const REMINDERS_CHANGED_EVENT = "btoddb-ha-reminders-reminders-changed";
 
 function clampInt(
   value: unknown,
@@ -416,6 +417,7 @@ export class BtoddbCalendarListCard extends LitElement {
 
   private _lastSignature = "";
   private _refreshTimer?: number;
+  private _reminderRefreshTimers: number[] = [];
 
   static getConfigElement() {
     return document.createElement("btoddb-calendar-list-card-editor");
@@ -442,11 +444,14 @@ export class BtoddbCalendarListCard extends LitElement {
   connectedCallback(): void {
     super.connectedCallback();
     this._refreshTimer = window.setInterval(() => this._fetch(), 60_000);
+    window.addEventListener(REMINDERS_CHANGED_EVENT, this._handleRemindersChanged);
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
     if (this._refreshTimer) window.clearInterval(this._refreshTimer);
+    window.removeEventListener(REMINDERS_CHANGED_EVENT, this._handleRemindersChanged);
+    this._clearReminderRefreshTimers();
   }
 
   protected updated(changed: Map<string, unknown>): void {
@@ -497,6 +502,31 @@ export class BtoddbCalendarListCard extends LitElement {
   private _showCalendarNameMode(): ShowCalendarNameMode {
     return normalizeShowMode(this._config.show_calendar_name, "auto");
   }
+
+  private _clearReminderRefreshTimers(): void {
+    for (const timer of this._reminderRefreshTimers) {
+      window.clearTimeout(timer);
+    }
+    this._reminderRefreshTimers = [];
+  }
+
+  private _scheduleReminderRefresh(): void {
+    this._clearReminderRefreshTimers();
+    for (const delay of [0, 1_000, 3_000]) {
+      this._reminderRefreshTimers.push(
+        window.setTimeout(() => {
+          void this._fetch();
+        }, delay),
+      );
+    }
+  }
+
+  private _handleRemindersChanged = (ev: Event): void => {
+    const changedEntity = (ev as CustomEvent<{ entity?: string }>).detail?.entity;
+    if (!changedEntity) return;
+    if (!this._entities().some(({ entity }) => entity === changedEntity)) return;
+    this._scheduleReminderRefresh();
+  };
 
   private async _fetch(): Promise<void> {
     if (!this.hass) return;
