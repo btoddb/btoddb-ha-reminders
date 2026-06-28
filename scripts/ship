@@ -8,11 +8,15 @@ MANIFEST="$REPO_ROOT/custom_components/btoddb_ha_reminders/manifest.json"
 usage() {
     echo "Usage: $0 <version-tag>"
     echo "       $0 --bump-patch"
+    echo "       $0 --bump-minor"
+    echo "       $0 --bump-major"
     echo "ex: $0 v1.2.3"
     echo "ex: $0 --bump-patch  # uses the next patch version from manifest.json"
+    echo "ex: $0 --bump-minor  # uses the next minor version from manifest.json"
+    echo "ex: $0 --bump-major  # uses the next major version from manifest.json"
 }
 
-next_patch_version() {
+next_version() {
     local current major minor patch
 
     current=$(jq -r '.version // empty' "$MANIFEST")
@@ -24,7 +28,22 @@ next_patch_version() {
     major="${BASH_REMATCH[1]}"
     minor="${BASH_REMATCH[2]}"
     patch="${BASH_REMATCH[3]}"
-    echo "v${major}.${minor}.$((10#$patch + 1))"
+
+    case "$1" in
+        patch)
+            echo "v${major}.${minor}.$((10#$patch + 1))"
+            ;;
+        minor)
+            echo "v${major}.$((10#$minor + 1)).0"
+            ;;
+        major)
+            echo "v$((10#$major + 1)).0.0"
+            ;;
+        *)
+            echo "Error: unknown bump type '$1'" >&2
+            exit 1
+            ;;
+    esac
 }
 
 if [[ $# -ne 1 ]]; then
@@ -38,8 +57,16 @@ case "$1" in
         exit 0
         ;;
     --bump-patch)
-        VERSION_TAG="$(next_patch_version)"
+        VERSION_TAG="$(next_version patch)"
         echo "Using next patch version from manifest.json: $VERSION_TAG"
+        ;;
+    --bump-minor)
+        VERSION_TAG="$(next_version minor)"
+        echo "Using next minor version from manifest.json: $VERSION_TAG"
+        ;;
+    --bump-major)
+        VERSION_TAG="$(next_version major)"
+        echo "Using next major version from manifest.json: $VERSION_TAG"
         ;;
     --*)
         echo "Error: unknown option '$1'" >&2
