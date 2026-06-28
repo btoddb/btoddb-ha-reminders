@@ -765,6 +765,21 @@ export class BtoddbCalendarListCard extends LitElement {
     return this._entities().length > 1;
   }
 
+  private _openCalendarDashboard(): void {
+    window.history.pushState(null, "", "/calendar?view=dayGridMonth");
+    window.dispatchEvent(
+      new CustomEvent("location-changed", {
+        detail: { replace: false },
+      }),
+    );
+  }
+
+  private _handleCardKeydown(ev: KeyboardEvent): void {
+    if (ev.key !== "Enter" && ev.key !== " ") return;
+    ev.preventDefault();
+    this._openCalendarDashboard();
+  }
+
   private _renderRows() {
     const rows = [];
     let lastKey = "";
@@ -803,7 +818,13 @@ export class BtoddbCalendarListCard extends LitElement {
   render() {
     const title = this._config.title ?? "Agenda";
     return html`
-      <ha-card .header=${title}>
+      <ha-card
+        .header=${title}
+        role="button"
+        tabindex="0"
+        @click=${this._openCalendarDashboard}
+        @keydown=${this._handleCardKeydown}
+      >
         <div class="content">
           ${this._error ? html`<div class="error">${this._error}</div>` : nothing}
           ${this._entries.length === 0
@@ -819,6 +840,13 @@ export class BtoddbCalendarListCard extends LitElement {
   static styles = css`
     .content {
       padding: 0 16px 12px;
+    }
+    ha-card {
+      cursor: pointer;
+    }
+    ha-card:focus-visible {
+      outline: 2px solid var(--primary-color, #03a9f4);
+      outline-offset: 2px;
     }
     .error {
       margin: 12px 0 0;
