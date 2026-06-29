@@ -79,12 +79,17 @@ def _snooze_durations_to_str(durations: list[int]) -> str:
 def _coerce_snooze_durations(value: object) -> list[int]:
     """Validate and coerce a comma-separated string or list to ``list[int]``."""
     if isinstance(value, list):
-        result = [int(v) for v in value]
+        tokens: list[object] = value
     elif isinstance(value, str):
-        result = [int(v.strip()) for v in value.split(",") if v.strip()]
+        tokens = [v.strip() for v in value.split(",") if v.strip()]
     else:
         msg = f"Expected string or list, got {type(value).__name__}"
         raise vol.Invalid(msg)
+    try:
+        result = [int(v) for v in tokens]
+    except (TypeError, ValueError) as err:
+        msg = "Enter whole numbers separated by commas (e.g. 15, 60)."
+        raise vol.Invalid(msg) from err
     if not result:
         msg = "Enter at least one snooze duration in minutes."
         raise vol.Invalid(msg)
