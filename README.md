@@ -135,7 +135,8 @@ Daily and weekly time reminders are supported. For a request like *"Remind me ev
 day at 2 PM to stand up and stretch"*, the agent should call `create_reminder` with
 `message: stand up and stretch`, `when` set to the next 2 PM, and `rrule` set to
 `FREQ=DAILY`. For weekly requests, use `FREQ=WEEKLY;BYDAY=MO` with the requested
-weekday. The copied function schema includes `rrule`; without it, the model may
+weekday; `when` must fall on the same weekday as `BYDAY` or the call is rejected.
+The copied function schema includes `rrule`; without it, the model may
 incorrectly claim recurring reminders are not supported.
 
 ### 5. Add the prompt lines that matter
