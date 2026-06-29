@@ -16,8 +16,15 @@ from datetime import datetime, timedelta
 # Action ID prefix embedded in mobile notification snooze buttons (RM-13).
 # Format: BTODDB_HA_REMINDERS_SNOOZE__{uid}__{minutes}
 SNOOZE_ACTION_PREFIX = "BTODDB_HA_REMINDERS_SNOOZE"
+# Action ID prefix for the dismiss ("OK") button (RM-13).
+# Format: BTODDB_HA_REMINDERS_OK__{uid}
+SNOOZE_OK_ACTION_PREFIX = "BTODDB_HA_REMINDERS_OK"
 # Notification tag prefix for per-reminder deduplication (RM-10).
 SNOOZE_TAG_PREFIX = "BTODDB_HA_REMINDERS"
+
+# A snooze action id is "{SNOOZE_ACTION_PREFIX}__{uid}__{minutes}" — exactly three
+# segments once split on the "__" separator (RM-14).
+_SNOOZE_ACTION_PARTS = 3
 
 # Catch-up window is clamped to at most 6h in the past (RM-7b): a lost, corrupted, or
 # never-initialized watermark can't flood the phone with a backlog of old reminders.
@@ -211,8 +218,34 @@ def build_snooze_notify_data(
         }
         for minutes in snooze_durations
     ]
-    actions.append({"action": f"BTODDB_HA_REMINDERS_OK__{uid}", "title": "OK"})
+    actions.append({"action": f"{SNOOZE_OK_ACTION_PREFIX}__{uid}", "title": "OK"})
     return {
         "tag": f"{SNOOZE_TAG_PREFIX}__{uid}",
         "actions": actions,
     }
+
+
+def parse_snooze_action(action: str) -> tuple[str, int] | None:
+    """
+    Parse a mobile snooze action id into ``(uid, minutes)`` (RM-14).
+
+    Mirrors the id minted by ``build_snooze_notify_data``:
+    ``{SNOOZE_ACTION_PREFIX}__{uid}__{minutes}``. Returns ``None`` — telling the event
+    listener to ignore the tap — for any of the three non-snooze cases:
+
+    - the action is not a snooze action (wrong/empty prefix, e.g. the "OK" button or
+      another integration's action),
+    - it is malformed (not exactly three ``__``-separated segments), or
+    - its minutes segment is not an integer.
+    """
+    if not action.startswith(f"{SNOOZE_ACTION_PREFIX}__"):
+        return None
+    parts = action.split("__")
+    if len(parts) != _SNOOZE_ACTION_PARTS:
+        return None
+    uid, minutes_str = parts[1], parts[2]
+    try:
+        minutes = int(minutes_str)
+    except ValueError:
+        return None
+    return uid, minutes

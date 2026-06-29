@@ -60,12 +60,12 @@ from .const import (
 )
 from .delivery import (
     CATCHUP_FLOOR,
-    SNOOZE_ACTION_PREFIX,
     ReminderEvent,
     advance_recurring,
     build_snooze_notify_data,
     due_events,
     effective_watermark,
+    parse_snooze_action,
     resolve_notify_target,
     snoozed_event,
     validate_rrule,
@@ -295,25 +295,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     async def _async_handle_notification_action(event: Event) -> None:
         """Forward mobile snooze button taps to the snooze service (RM-14)."""
-        action: str = event.data.get("action", "")
-        if not action.startswith(f"{SNOOZE_ACTION_PREFIX}__"):
+        parsed = parse_snooze_action(event.data.get("action", ""))
+        if parsed is None:
             return
-        parts = action.split("__")
-        if len(parts) != 3:  # noqa: PLR2004
-            _LOGGER.debug("Ignoring malformed snooze action id %r", action)
-            return
-        uid, minutes_str = parts[1], parts[2]
-        try:
-            minutes = int(minutes_str)
-        except ValueError:
-            _LOGGER.debug("Ignoring snooze action with non-integer minutes: %r", action)
-            return
+        uid, minutes = parsed
         try:
             await hass.services.async_call(
                 DOMAIN,
                 SERVICE_SNOOZE,
                 {ATTR_UID: uid, ATTR_MINUTES: minutes},
                 blocking=True,
+            )
+        except vol.Invalid as err:
+            # The one-shot snooze copy is pruned after ~7 days, so a tap on a stale
+            # notification reaches a uid the store no longer has. That's expected, not
+            # an error — log it at debug without a traceback (the snooze handler raises
+            # vol.Invalid via _reject_input for the not-found case).
+            _LOGGER.debug(
+                "Ignoring snooze for stale/unknown reminder uid=%r: %s", uid, err
             )
         except Exception:
             _LOGGER.exception("Failed to handle snooze action for uid=%r", uid)

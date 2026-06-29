@@ -16,7 +16,9 @@ advance_recurring = delivery.advance_recurring
 validate_rrule = delivery.validate_rrule
 snoozed_event = delivery.snoozed_event
 build_snooze_notify_data = delivery.build_snooze_notify_data
+parse_snooze_action = delivery.parse_snooze_action
 SNOOZE_ACTION_PREFIX = delivery.SNOOZE_ACTION_PREFIX
+SNOOZE_OK_ACTION_PREFIX = delivery.SNOOZE_OK_ACTION_PREFIX
 SNOOZE_TAG_PREFIX = delivery.SNOOZE_TAG_PREFIX
 
 TZ = UTC
@@ -353,3 +355,73 @@ def test_build_snooze_notify_data_empty_durations_only_ok():
     data = build_snooze_notify_data("u", [])
     assert len(data["actions"]) == 1
     assert data["actions"][0]["title"] == "OK"
+
+
+def test_build_snooze_notify_data_ok_action_uses_constant():
+    # The OK button id must be built from the named constant, not a stray literal.
+    data = build_snooze_notify_data("uid123", [15])
+    ok_action = next(a for a in data["actions"] if a["title"] == "OK")
+    assert ok_action["action"] == f"{SNOOZE_OK_ACTION_PREFIX}__uid123"
+
+
+def test_snooze_ok_action_prefix_distinct_from_snooze_prefix():
+    # The OK and snooze prefixes must not collide: if "OK" started with the snooze
+    # prefix, parse_snooze_action would misread a dismiss tap as a snooze.
+    assert SNOOZE_OK_ACTION_PREFIX != SNOOZE_ACTION_PREFIX
+    assert not SNOOZE_OK_ACTION_PREFIX.startswith(f"{SNOOZE_ACTION_PREFIX}__")
+
+
+# ---------------------------------------------------------------------------
+# parse_snooze_action() — pure helper for mobile notification action routing.
+# ---------------------------------------------------------------------------
+
+
+def test_parse_snooze_action_valid_returns_uid_and_minutes():
+    assert parse_snooze_action(f"{SNOOZE_ACTION_PREFIX}__uid123__15") == ("uid123", 15)
+
+
+def test_parse_snooze_action_round_trips_build_snooze_notify_data():
+    data = build_snooze_notify_data("abc123", [15, 60])
+    snooze_ids = [
+        a["action"]
+        for a in data["actions"]
+        if a["action"].startswith(f"{SNOOZE_ACTION_PREFIX}__")
+    ]
+    assert [parse_snooze_action(aid) for aid in snooze_ids] == [
+        ("abc123", 15),
+        ("abc123", 60),
+    ]
+
+
+def test_parse_snooze_action_ok_button_is_not_a_snooze():
+    data = build_snooze_notify_data("uid123", [15])
+    ok_id = next(a["action"] for a in data["actions"] if a["title"] == "OK")
+    assert parse_snooze_action(ok_id) is None
+
+
+def test_parse_snooze_action_empty_string_returns_none():
+    assert parse_snooze_action("") is None
+
+
+def test_parse_snooze_action_foreign_action_returns_none():
+    assert parse_snooze_action("SOME_OTHER_INTEGRATION__do_thing") is None
+
+
+def test_parse_snooze_action_bare_prefix_returns_none():
+    assert parse_snooze_action(SNOOZE_ACTION_PREFIX) is None
+
+
+def test_parse_snooze_action_too_few_segments_returns_none():
+    assert parse_snooze_action(f"{SNOOZE_ACTION_PREFIX}__uid123") is None
+
+
+def test_parse_snooze_action_too_many_segments_returns_none():
+    assert parse_snooze_action(f"{SNOOZE_ACTION_PREFIX}__uid__15__extra") is None
+
+
+def test_parse_snooze_action_non_integer_minutes_returns_none():
+    assert parse_snooze_action(f"{SNOOZE_ACTION_PREFIX}__uid123__abc") is None
+
+
+def test_parse_snooze_action_empty_minutes_returns_none():
+    assert parse_snooze_action(f"{SNOOZE_ACTION_PREFIX}__uid123__") is None
