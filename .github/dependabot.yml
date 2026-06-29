@@ -5,6 +5,9 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "tuesday"
+      time: "02:00"
+      timezone: "America/Los_Angeles"
     groups:
       patch-and-minor:
         update-types: ["minor", "patch"]
@@ -13,6 +16,9 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "monday"
+      time: "02:00"
+      timezone: "America/Los_Angeles"
     groups:
       patch-and-minor:
         update-types: ["minor", "patch"]
@@ -21,6 +27,9 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "wednesday"
+      time: "02:00"
+      timezone: "America/Los_Angeles"
     groups:
       patch-and-minor:
         update-types: ["minor", "patch"]
