@@ -23,14 +23,20 @@ whichever was supplied and stores a reminder event. A naive `when` (no offset) i
 interpreted in HA's configured time zone.
 
 **RM-9 (constraint).** `btoddb_ha_reminders.create` returns response data
-(`{success, message, start}`, via `SupportsResponse.ONLY`). Without a returned tool
-result the conversation agent has no signal and guesses whether the reminder was set,
-non-deterministically confirming or denying even when the event was stored every time.
-`start` is rendered as an already **spoken-language** time string (e.g. "tomorrow at
-6 PM"; minutes omitted on the hour; weekday name for 2-6 days out; weekday plus
-month/day beyond a week, since a bare weekday name is ambiguous once it could refer to
-more than one occurrence) rather than a raw datetime, so the agent can echo it verbatim
-instead of reading an ISO/digit-clock form aloud.
+(`{success, message, start, confirmation}`, via `SupportsResponse.ONLY`). Without a
+returned tool result the conversation agent has no signal and guesses whether the
+reminder was set, non-deterministically confirming or denying even when the event was
+stored every time. `start` is rendered as an already **spoken-language** time string
+(e.g. "tomorrow at 6 PM"; minutes omitted on the hour; weekday name for 2-6 days out;
+weekday plus month/day beyond a week, since a bare weekday name is ambiguous once it
+could refer to more than one occurrence) rather than a raw datetime. `confirmation`
+wraps that spoken time in a ready-to-say success sentence so the agent can echo it
+verbatim instead of improvising a failure after a successful write.
+
+**RM-9a (constraint).** `btoddb_ha_reminders.update` returns the same spoken response
+shape as `create` (`{success, message, start, confirmation}`, plus `rrule` when present)
+so conversation agents can use one confirmation contract for time-based reminder
+creates and updates.
 
 ## Storage
 

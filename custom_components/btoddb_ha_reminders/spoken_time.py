@@ -47,3 +47,37 @@ def format_spoken_time(dt: datetime, now: datetime) -> str:
         day = dt.strftime("%A, %B ") + str(dt.day)
 
     return f"{day} at {clock}"
+
+
+def _build_response(
+    message: str,
+    start: datetime,
+    now: datetime,
+    confirmation_prefix: str,
+    rrule: str | None = None,
+) -> dict[str, object]:
+    """Build the service response handed back to conversation agents."""
+    spoken_start = format_spoken_time(start, now)
+    response: dict[str, object] = {
+        "success": True,
+        "message": message,
+        "start": spoken_start,
+        "confirmation": f"{confirmation_prefix} {spoken_start}: {message}",
+    }
+    if rrule is not None:
+        response["rrule"] = rrule
+    return response
+
+
+def build_create_response(
+    message: str, start: datetime, now: datetime, rrule: str | None = None
+) -> dict[str, object]:
+    """Build the create service response handed back to conversation agents."""
+    return _build_response(message, start, now, "Reminder set for", rrule)
+
+
+def build_update_response(
+    message: str, start: datetime, now: datetime, rrule: str | None = None
+) -> dict[str, object]:
+    """Build the update service response handed back to conversation agents."""
+    return _build_response(message, start, now, "Reminder updated to", rrule)

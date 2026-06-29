@@ -8,8 +8,8 @@
 #
 # Why response_variable is mandatory: without the returned tool result the model has no
 # signal that the reminder was written and will guess — saying "Done" or "I can't set
-# that" non-deterministically. The service returns {success, message, start}; tell the
-# model to echo `start` (already a spoken-language time) verbatim. (RM-9)
+# that" non-deterministically. The service returns {success, message, start,
+# confirmation}; tell the model to echo `confirmation` verbatim. (RM-9)
 #
 # Why in_minutes for relative delays: small models are unreliable at datetime math —
 # "remind me in 5 minutes" once landed at 3am. Have the model pass the offset and let
@@ -24,8 +24,9 @@
       yourself. For a specific clock time or date ("at 6pm", "tomorrow at 9am",
       "next Tuesday at 2pm") pass when as an absolute ISO 8601 local datetime
       resolved from the current time shown in the system prompt. Always pass message.
-      The returned start field is already a natural spoken-language time (e.g.
-      "tomorrow at 6 PM") — repeat it back as-is, don't reformat it.
+      The returned confirmation field is already a natural spoken response (e.g.
+      "Reminder set for tomorrow at 6 PM: take out the trash") — repeat it back
+      as-is, don't reformat it.
     parameters:
       type: object
       properties:

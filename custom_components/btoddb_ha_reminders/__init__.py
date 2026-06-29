@@ -77,7 +77,7 @@ from .location import (
     triggered,
 )
 from .location_store import LocationReminderStore
-from .spoken_time import format_spoken_time
+from .spoken_time import build_create_response, build_update_response
 from .store import ReminderStore
 
 if TYPE_CHECKING:
@@ -505,12 +505,7 @@ def _async_register_service(hass: HomeAssistant, store: ReminderStore) -> None:
             uid=uuid.uuid4().hex, summary=message, start=start, rrule=rrule
         )
         await store.async_add_event(event)
-        return {
-            "success": True,
-            "message": message,
-            "start": format_spoken_time(start, now),
-            **({"rrule": rrule} if rrule is not None else {}),
-        }
+        return build_create_response(message, start, now, rrule)
 
     async def _handle_update(call: ServiceCall) -> ServiceResponse:
         uid: str = call.data[ATTR_UID]
@@ -549,11 +544,10 @@ def _async_register_service(hass: HomeAssistant, store: ReminderStore) -> None:
             msg = f"Reminder with uid {uid!r} not found."
             _reject_input(msg)
         updated = next((e for e in store.events if e.uid == uid), None)
-        return {
-            "success": True,
-            "message": updated.summary if updated else (message or ""),
-            "start": format_spoken_time(updated.start, now) if updated else "",
-        }
+        if updated is None:
+            msg = f"Reminder with uid {uid!r} not found after update."
+            _reject_input(msg)
+        return build_update_response(updated.summary, updated.start, now, updated.rrule)
 
     hass.services.async_register(
         DOMAIN,

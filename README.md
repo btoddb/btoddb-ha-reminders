@@ -17,9 +17,9 @@ difference between reminders that work and reminders that randomly fail.**
 
 - **`btoddb_ha_reminders.create`** service — `message`, plus **either** `when` (absolute ISO 8601
   local datetime) **or** `in_minutes` (relative offset). Returns
-  `{success, message, start}`, where `start` is a spoken-language time string
-  ("tomorrow at 6 PM") for the agent to read back. Optional `rrule` param enables
-  recurring reminders (`FREQ=DAILY` / `FREQ=WEEKLY;BYDAY=MO`).
+  `{success, message, start, confirmation}`, where `confirmation` is a ready-to-say
+  sentence for the agent to read back. Optional `rrule` param enables recurring
+  reminders (`FREQ=DAILY` / `FREQ=WEEKLY;BYDAY=MO`).
 - **`btoddb_ha_reminders.create_location`** service — `message`, `person` entity, `zone`
   entity, `trigger` (`enter` or `leave`). Fires the moment the person enters or leaves
   that zone. Set `persistent: true` to re-fire on every matching transition rather than
@@ -118,8 +118,8 @@ The function **must** request the service response
 (`response_variable: _function_result`). Without it the tool result handed back to the
 model is empty, the model has no signal either way, and it **guesses** — saying "Done"
 or "I can't set that reminder right now" non-deterministically even though the reminder
-was written every time. The service returns `{success, message, start}`; the prompt
-tells the model to echo `start` verbatim (it's already spoken-language).
+was written every time. The service returns `{success, message, start, confirmation}`;
+the prompt tells the model to echo `confirmation` verbatim.
 
 ### 4. Route relative delays through `in_minutes`, never model-computed clock times
 
@@ -136,8 +136,8 @@ From [`examples/prompt-snippet.txt`](examples/prompt-snippet.txt):
   with a template every turn — never paste a static time.
 - **"Never tell the user a reminder is set unless you called create_reminder this turn
   and it returned success"** — kills false confirmations.
-- **"Speak dates/times the way a person would … never ISO or digit-clock"** — so the
-  model reads `start` back naturally instead of "six zero zero pm".
+- **"Speak dates/times the way a person would … never ISO or digit-clock"** — fallback
+  guardrails if the model does not echo the returned `confirmation`.
 
 ### 6. Stop false confirmations on small models: bound the context history
 
