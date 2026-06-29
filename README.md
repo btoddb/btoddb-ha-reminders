@@ -107,8 +107,9 @@ to the prompt; omit it for non-reasoning / cloud models.
 ### 2. Define a dedicated `create_reminder` function — don't just expose the service
 
 A generic "call any service" function only forwards `entity_id` and **silently drops**
-`message` / `when` / `in_minutes`, so reminders get created empty and untimed. You must
-give the agent a typed function. Paste
+`message` / `when` / `in_minutes` / `rrule`, so reminders get created empty, untimed,
+or one-shot when the user asked for a recurring schedule. You must give the agent a
+typed function. Paste
 [`examples/create_reminder.function.yaml`](examples/create_reminder.function.yaml) into
 the agent's **functions** field.
 
@@ -127,6 +128,15 @@ Small models are unreliable at datetime arithmetic — left to compute it, *"rem
 5 minutes"* once landed at **3am**. The function description instructs the model to pass
 `in_minutes` for relative requests and **not** compute a clock time; the home computes
 `now() + offset`. Absolute times/dates go through `when` as ISO 8601 local.
+
+### 4a. Route recurring reminders through `rrule`, never refuse them
+
+Daily and weekly time reminders are supported. For a request like *"Remind me every
+day at 2 PM to stand up and stretch"*, the agent should call `create_reminder` with
+`message: stand up and stretch`, `when` set to the next 2 PM, and `rrule` set to
+`FREQ=DAILY`. For weekly requests, use `FREQ=WEEKLY;BYDAY=MO` with the requested
+weekday. The copied function schema includes `rrule`; without it, the model may
+incorrectly claim recurring reminders are not supported.
 
 ### 5. Add the prompt lines that matter
 

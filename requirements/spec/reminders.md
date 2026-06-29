@@ -22,6 +22,13 @@ local datetime (`when`). `in_minutes` takes priority if both are supplied.
 whichever was supplied and stores a reminder event. A naive `when` (no offset) is
 interpreted in HA's configured time zone.
 
+**RM-5a.** `btoddb_ha_reminders.create` accepts optional `rrule` for recurring
+time-based reminders. The supported voice/tool contract is `FREQ=DAILY` for daily
+reminders and `FREQ=WEEKLY;BYDAY=<weekday>` for weekly reminders, with `when` set to
+the first desired occurrence. Conversation-agent function definitions must expose and
+forward `rrule`; otherwise the model may falsely refuse recurring reminders even
+though the engine supports them.
+
 **RM-9 (constraint).** `btoddb_ha_reminders.create` returns response data
 (`{success, message, start, confirmation}`, via `SupportsResponse.ONLY`). Without a
 returned tool result the conversation agent has no signal and guesses whether the

@@ -1,9 +1,14 @@
 create:
   name: Create reminder
   description: >-
-    Add a time-based reminder at an absolute time or a relative delay. Returns
-    {success, message, start, confirmation} where confirmation is a ready-to-say
-    sentence the conversation agent can echo back verbatim.
+    Add a time-based reminder at an absolute time, a relative delay, or a recurring
+    daily/weekly schedule. Returns {success, message, start, confirmation} where
+    confirmation is a ready-to-say sentence the conversation agent can echo back
+    verbatim.
+
+    For recurring requests such as "every day at 2 PM", set when to the first
+    desired occurrence and set rrule to "FREQ=DAILY". For weekly requests, set
+    rrule to "FREQ=WEEKLY;BYDAY=MO" with the requested weekday.
   fields:
     message:
       name: Message

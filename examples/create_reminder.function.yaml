@@ -14,6 +14,12 @@
 # Why in_minutes for relative delays: small models are unreliable at datetime math —
 # "remind me in 5 minutes" once landed at 3am. Have the model pass the offset and let
 # the home compute the time. (RM-4a)
+#
+# Why rrule is present: recurring reminders are supported by the component, but the
+# model will claim they are impossible unless the function schema exposes an explicit
+# recurrence argument. For "every day at 2 PM", pass the next 2 PM as `when` and
+# `rrule: FREQ=DAILY`; for "every Monday at 9 AM", pass the next Monday at 9 AM and
+# `rrule: FREQ=WEEKLY;BYDAY=MO`.
 
 - spec:
     name: create_reminder
@@ -23,10 +29,14 @@
       hour") pass in_minutes (hours times 60) and do NOT compute a clock time
       yourself. For a specific clock time or date ("at 6pm", "tomorrow at 9am",
       "next Tuesday at 2pm") pass when as an absolute ISO 8601 local datetime
-      resolved from the current time shown in the system prompt. Always pass message.
-      The returned confirmation field is already a natural spoken response (e.g.
-      "Reminder set for tomorrow at 6 PM: take out the trash") — repeat it back
-      as-is, don't reformat it.
+      resolved from the current time shown in the system prompt. For recurring
+      requests, do not refuse: pass when as the first desired occurrence and pass
+      rrule as "FREQ=DAILY" for "every day"/"daily", or
+      "FREQ=WEEKLY;BYDAY=MO" for "every Monday"/weekly requests (replace MO with
+      TU/WE/TH/FR/SA/SU as needed). Always pass message. The returned
+      confirmation field is already a natural spoken response (e.g. "Reminder set
+      for tomorrow at 6 PM: take out the trash") — repeat it back as-is, don't
+      reformat it.
     parameters:
       type: object
       properties:
@@ -39,6 +49,9 @@
         message:
           type: string
           description: What to remind the user about, in their own words.
+        rrule:
+          type: string
+          description: Optional recurrence rule. Use FREQ=DAILY for "every day"/"daily"; use FREQ=WEEKLY;BYDAY=MO for weekly reminders, replacing MO with TU/WE/TH/FR/SA/SU. Set when to the first occurrence. Omit for one-time reminders.
       required: [message]
   function:
     type: script
@@ -48,4 +61,5 @@
           when: "{{ when }}"
           in_minutes: "{{ in_minutes }}"
           message: "{{ message }}"
+          rrule: "{{ rrule }}"
         response_variable: _function_result
