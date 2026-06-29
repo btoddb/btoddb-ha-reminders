@@ -36,7 +36,7 @@
   "services": {
     "create": {
       "name": "Create reminder",
-      "description": "Add a time-based reminder at an absolute time or a relative delay.",
+      "description": "Add a time-based reminder at an absolute time, a relative delay, or a recurring daily/weekly schedule.",
       "fields": {
         "message": {
           "name": "Message",
