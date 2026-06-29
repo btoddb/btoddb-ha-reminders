@@ -80,3 +80,14 @@ def triggered(
         for r in reminders
         if r.delivered_at is None and r.person == person and r.trigger == kind
     ]
+
+
+def format_spoken_location(trigger: str, zone_label: str) -> str:
+    """
+    Return a spoken phrase describing when the location reminder fires (LOC-9).
+
+    Mirrors ``spoken_time.format_spoken_time`` — a human-readable phrase the
+    conversation agent can echo verbatim rather than reading a raw entity_id.
+    """
+    verb = "arrive at" if trigger == ENTER else "leave"
+    return f"when you {verb} {zone_label}"

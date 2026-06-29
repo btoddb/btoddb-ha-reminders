@@ -120,9 +120,19 @@ time reminder. `async_mark_delivered` is a no-op for persistent reminders; the
 `tracked_persons` subscription is never released. Persistent reminders are never pruned
 by the 7-day retention sweep (they have no `delivered_at` to prune on).
 
-**LOC-out.** Non-zone locations (raw addresses) and a conversation-agent function for
-creating location reminders are out of scope for now; `zone` is stored as an entity_id
-string so an address-backed source can slot in later without reshaping the model.
+**LOC-9 (constraint).** `btoddb_ha_reminders.create_location` returns response data
+(`{success, message, start}`, via `SupportsResponse.OPTIONAL`). `OPTIONAL` (not `ONLY`)
+is deliberate: the dashboard card calls without `return_response` and must keep working,
+exactly as `update` already does for time reminders. `start` is a spoken-language phrase
+(e.g. "when you leave Work") rendered by `location.format_spoken_location` — the
+conversation agent can echo it verbatim rather than reading a raw entity_id. Without a
+returned tool result the agent has no signal and guesses, confirming or denying
+non-deterministically even when the reminder was stored every time (same failure mode as
+RM-9 for time reminders).
+
+**LOC-out.** Non-zone locations (raw addresses) are out of scope for now; `zone` is
+stored as an entity_id string so an address-backed source can slot in later without
+reshaping the model.
 
 ## Snooze (time-based reminders)
 

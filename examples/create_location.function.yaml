@@ -1,0 +1,67 @@
+# Tuned create_location_reminder function for the Extended OpenAI Conversation
+# integration (jekalmin/extended_openai_conversation). Paste this into the conversation
+# agent's `functions` field, alongside create_reminder (Settings -> Voice assistants ->
+# your assistant -> edit).
+#
+# This is the voice path for *location* reminders ("remind me to grab the dry cleaning
+# when I leave work") — the zone-based counterpart of create_reminder. The component's
+# create_location service already exists; this function is what lets the agent call it.
+#
+# Why a dedicated typed function instead of a generic execute_services call: same reason
+# as create_reminder — a generic call only forwards entity_id and silently drops
+# message / person / zone / trigger, so the reminder is created empty and can never fire.
+#
+# Why person and zone are entity_ids, not place names: the service matches a person's
+# state against a zone, so it needs the actual person.* and zone.* entity_ids. The model
+# turns "me"/"I" and a spoken place name ("work", "the gym") into those ids using the
+# entities exposed to the assistant and the people/zones listed in the system prompt
+# (see prompt-snippet.txt). It is the location analog of routing relative delays through
+# in_minutes: give the model the small, bounded mapping job and nothing harder.
+#
+# Why response_variable is mandatory: identical to create_reminder (RM-9 / LOC-9) —
+# without the returned tool result the model has no signal the reminder was written and
+# guesses, confirming or denying non-deterministically. create_location returns
+# {success, message, start}; start is already a spoken phrase ("when you leave Work") to
+# be echoed verbatim.
+
+- spec:
+    name: create_location_reminder
+    description: >-
+      Create a location-based reminder for the user — one delivered the moment a person
+      arrives at or leaves a place, NOT at a clock time. Use whenever the user ties a
+      reminder to a place ("when I get to work", "as I leave home", "next time I'm at the
+      store"). Choose person as the person.* entity for whoever should be reminded (the
+      speaker unless they name someone else), and zone as the zone.* entity for the place
+      they named — both from the people and zones listed in the system prompt; do NOT
+      invent ids. Set trigger to "enter" for arriving ("when I get to", "next time I'm
+      at") or "leave" for departing ("when I leave", "as I head out"). Always pass
+      message. The returned start field is already a natural spoken phrase (e.g. "when
+      you leave Work") — repeat it back as-is, don't reformat it. If you can't match the
+      place to one of the listed zones, ask which zone rather than guessing.
+    parameters:
+      type: object
+      properties:
+        message:
+          type: string
+          description: What to remind the user about, in their own words.
+        person:
+          type: string
+          description: The person.* entity to track (e.g. person.todd). Usually the speaker.
+        zone:
+          type: string
+          description: The zone.* entity for the named place (e.g. zone.work, zone.home).
+        trigger:
+          type: string
+          enum: [enter, leave]
+          description: '"enter" when arriving at the zone, "leave" when departing it.'
+      required: [message, person, zone, trigger]
+  function:
+    type: script
+    sequence:
+      - service: btoddb_ha_reminders.create_location
+        data:
+          message: "{{ message }}"
+          person: "{{ person }}"
+          zone: "{{ zone }}"
+          trigger: "{{ trigger }}"
+        response_variable: _function_result

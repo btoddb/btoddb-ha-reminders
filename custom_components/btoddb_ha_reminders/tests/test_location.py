@@ -10,6 +10,7 @@ location = load_module("location")
 LocationReminder = location.LocationReminder
 transition_kind = location.transition_kind
 triggered = location.triggered
+format_spoken_location = location.format_spoken_location
 ENTER = location.ENTER
 LEAVE = location.LEAVE
 
@@ -106,6 +107,27 @@ def test_persistent_reminder_excluded_when_delivered():
     # snapshot-in-storage case is handled correctly.
     reminders = [_rem("p", persistent=True, delivered=NOW)]
     assert triggered(reminders, "person.todd", ENTER) == []
+
+
+# --- format_spoken_location (LOC-9) -----------------------------------------------
+
+
+def test_spoken_location_enter():
+    assert format_spoken_location(ENTER, "Work") == "when you arrive at Work"
+
+
+def test_spoken_location_leave():
+    assert format_spoken_location(LEAVE, "Work") == "when you leave Work"
+
+
+def test_spoken_location_home_enter():
+    assert format_spoken_location(ENTER, "home") == "when you arrive at home"
+
+
+def test_spoken_location_verbatim_zone_label():
+    # Zone label is passed in as-is (friendly name or best-effort slug); the function
+    # must not transform it.
+    assert format_spoken_location(LEAVE, "The Gym") == "when you leave The Gym"
 
 
 # --- retention predicate (mirrors LocationReminderStore.async_prune) --------------
