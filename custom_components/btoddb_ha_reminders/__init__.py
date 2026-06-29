@@ -38,7 +38,6 @@ from homeassistant.core import (
     SupportsResponse,
     callback,
 )
-from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.event import (
     async_track_state_change_event,
@@ -79,12 +78,29 @@ from .store import ReminderStore
 if TYPE_CHECKING:
     from collections.abc import Callable
     from datetime import datetime
+    from typing import NoReturn
 
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import Event
     from homeassistant.helpers.event import EventStateChangedData
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _reject_input(msg: str) -> NoReturn:
+    """
+    Reject bad user/request input without logging it as an ERROR.
+
+    Raising ``ServiceValidationError`` (a ``HomeAssistantError``) made HA's websocket
+    layer log the message via ``connection.logger.error(...)``, so a user repeatedly
+    submitting bad input could spam the log with ERRORs. ``voluptuous.Invalid`` is still
+    returned to the caller as an error response — so the card's error banner and the
+    conversation agent show the same message — but HA does not log it, so we emit it
+    ourselves at DEBUG instead.
+    """
+    _LOGGER.debug("Rejected reminder service call: %s", msg)
+    raise vol.Invalid(msg)
+
 
 PLATFORMS: list[Platform] = [Platform.CALENDAR, Platform.SENSOR]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
@@ -474,12 +490,12 @@ def _async_register_service(hass: HomeAssistant, store: ReminderStore) -> None:
                 f"Could not determine reminder time"
                 f" (when={when_v!r}, in_minutes={mins_v!r})"
             )
-            raise ServiceValidationError(msg)
+            _reject_input(msg)
         rrule: str | None = call.data.get(ATTR_RRULE) or None
         if rrule is not None:
             err = validate_rrule(rrule, start)
             if err is not None:
-                raise ServiceValidationError(err)
+                _reject_input(err)
         event = ReminderEvent(
             uid=uuid.uuid4().hex, summary=message, start=start, rrule=rrule
         )
@@ -506,17 +522,17 @@ def _async_register_service(hass: HomeAssistant, store: ReminderStore) -> None:
             msg = (
                 "Provide at least one of message, when, in_minutes, or rrule to update."
             )
-            raise ServiceValidationError(msg)
+            _reject_input(msg)
         if start is not None and start < now:
             msg = f"Cannot update reminder to a time in the past ({start.isoformat()})."
-            raise ServiceValidationError(msg)
+            _reject_input(msg)
         if new_rrule is not None:
             check_start = start or next(
                 (e.start for e in store.events if e.uid == uid), now
             )
             err = validate_rrule(new_rrule, check_start)
             if err is not None:
-                raise ServiceValidationError(err)
+                _reject_input(err)
         found = await store.async_update_event(
             uid,
             summary=message,
@@ -526,7 +542,7 @@ def _async_register_service(hass: HomeAssistant, store: ReminderStore) -> None:
         )
         if not found:
             msg = f"Reminder with uid {uid!r} not found."
-            raise ServiceValidationError(msg)
+            _reject_input(msg)
         updated = next((e for e in store.events if e.uid == uid), None)
         return {
             "success": True,
@@ -563,7 +579,7 @@ def _async_register_snooze_service(hass: HomeAssistant, store: ReminderStore) ->
         original = next((e for e in store.events if e.uid == uid), None)
         if original is None:
             msg = f"Reminder with uid {uid!r} not found."
-            raise ServiceValidationError(msg)
+            _reject_input(msg)
         await store.async_add_event(snoozed_event(original, now, minutes))
 
     hass.services.async_register(
@@ -598,10 +614,10 @@ def _async_register_location_services(
         existing = next((e for e in store.events if e.uid == uid), None)
         if existing is None:
             msg = f"Location reminder with uid {uid!r} not found."
-            raise ServiceValidationError(msg)
+            _reject_input(msg)
         if existing.delivered_at is not None:
             msg = f"Location reminder with uid {uid!r} has already been delivered."
-            raise ServiceValidationError(msg)
+            _reject_input(msg)
         message: str | None = call.data.get(ATTR_MESSAGE)
         person: str | None = call.data.get(ATTR_PERSON)
         zone: str | None = call.data.get(ATTR_ZONE)
@@ -615,7 +631,7 @@ def _async_register_location_services(
             and persistent is None
         ):
             msg = "Provide at least one field to update."
-            raise ServiceValidationError(msg)
+            _reject_input(msg)
         await store.async_update_event(
             uid,
             summary=message,
