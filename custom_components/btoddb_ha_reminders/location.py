@@ -13,6 +13,8 @@ it (``"home"`` for the home zone, else the zone's friendly name) and passes it i
 
 from __future__ import annotations
 
+import difflib
+import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -26,6 +28,79 @@ LEAVE = "leave"
 # transition into or out of these as entering/leaving a zone (avoids spurious fires on
 # startup or when a tracker drops offline).
 _UNKNOWN_STATES = frozenset({"", "unknown", "unavailable", "none", "None"})
+
+# Fuzzy-matching thresholds for resolve_zone.
+# A spoken name must score at least _THRESHOLD against the best candidate, and that
+# candidate must lead the runner-up by at least _MARGIN — otherwise the match is
+# ambiguous and we decline to guess.
+_ZONE_MATCH_THRESHOLD = 0.72
+_ZONE_MATCH_MARGIN = 0.08
+
+
+def _normalize(text: str) -> str:
+    """Lowercase, strip punctuation, collapse whitespace."""
+    text = text.lower()
+    text = re.sub(r"[^\w\s]", "", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def resolve_zone(spoken: str, zones: dict[str, str]) -> str | None:
+    """
+    Match a spoken place name to a configured zone entity_id.
+
+    ``zones`` maps entity_id → friendly_name (may be empty string if unknown).
+    Three-tier matching:
+    1. Exact entity_id match (e.g. the model already passed "zone.work").
+    2. Exact normalized friendly-name or slug match (case/punctuation ignored).
+    3. Fuzzy match via difflib above ``_ZONE_MATCH_THRESHOLD``, but only when the best
+       candidate leads the runner-up by at least ``_ZONE_MATCH_MARGIN``; otherwise the
+       match is ambiguous and ``None`` is returned.
+
+    Returns the matched entity_id, or ``None`` when nothing matches well enough or the
+    result is genuinely ambiguous.
+    """
+    if not spoken or not zones:
+        return None
+
+    # Tier 1: exact entity_id
+    if spoken in zones:
+        return spoken
+
+    norm_spoken = _normalize(spoken)
+
+    # Pre-compute normalized forms (name and slug) for every zone.
+    norms: list[tuple[str, str, str]] = []
+    for entity_id, friendly_name in zones.items():
+        slug = entity_id.split(".", 1)[-1]
+        norm_name = _normalize(friendly_name) if friendly_name else ""
+        norm_slug = _normalize(slug)
+        norms.append((entity_id, norm_name, norm_slug))
+
+    # Tier 2: exact normalized match against friendly name or slug
+    for entity_id, norm_name, norm_slug in norms:
+        if norm_spoken in (norm_name, norm_slug):
+            return entity_id
+
+    # Tier 3: fuzzy match — take the best of name vs slug score for each zone
+    scores: list[tuple[float, str]] = []
+    for entity_id, norm_name, norm_slug in norms:
+        score_name = (
+            difflib.SequenceMatcher(None, norm_spoken, norm_name).ratio()
+            if norm_name
+            else 0.0
+        )
+        score_slug = difflib.SequenceMatcher(None, norm_spoken, norm_slug).ratio()
+        scores.append((max(score_name, score_slug), entity_id))
+
+    scores.sort(reverse=True)
+    best_score, best_id = scores[0]
+    if best_score < _ZONE_MATCH_THRESHOLD:
+        return None
+    runner_up = scores[1][0] if len(scores) > 1 else 0.0
+    if (best_score - runner_up) < _ZONE_MATCH_MARGIN:
+        return None  # ambiguous — decline to guess
+
+    return best_id
 
 
 @dataclass(frozen=True)

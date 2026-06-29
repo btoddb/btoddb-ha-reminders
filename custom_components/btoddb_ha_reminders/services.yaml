@@ -133,12 +133,24 @@ create_location:
     Add a reminder delivered the moment a person enters or leaves a Home Assistant
     zone. One-shot by default (fires once, then stays visible for 7 days). Set
     persistent to true to re-fire on every matching transition instead.
+
+    Word order does not matter — "When I arrive at X, remind me to Y" and "Remind
+    me to Y when I arrive at X" are identical requests. In both cases, set message
+    to only the reminder content ("Y") and strip the location clause entirely — do
+    not include phrases like "when I arrive at X" or "when I leave X" in message.
+
+    Pass the spoken place name directly in the zone field and let the integration
+    match it to the nearest configured zone — do not over-confirm near-misses or
+    ask the user to clarify unless the service itself returns an error.
   fields:
     message:
       name: Message
-      description: What to remind about, in the user's own words.
+      description: >-
+        What to remind about, in the user's own words. Do NOT include the
+        location or trigger clause ("when I arrive at X", "when I leave Y") — that
+        information belongs in the zone and trigger fields.
       required: true
-      example: grab the dry cleaning
+      example: order a wooden ship
       selector:
         text:
     person:
@@ -151,12 +163,17 @@ create_location:
           domain: person
     zone:
       name: Zone
-      description: The zone to watch.
+      description: >-
+        The place name or zone entity_id to watch. Pass the spoken place name
+        exactly as the user said it (e.g. "Bruciato", "Docks Marina Grill",
+        "Agate") — the integration fuzzy-matches it to the nearest configured
+        zone. Do not over-confirm or ask the user to clarify a near-miss; pass the
+        name through and the integration will resolve it or return an error with
+        available zone names.
       required: true
-      example: zone.work
+      example: Bruciato
       selector:
-        entity:
-          domain: zone
+        text:
     trigger:
       name: Trigger
       description: Deliver when the person enters the zone, or when they leave it.
@@ -207,12 +224,13 @@ update_location:
           domain: person
     zone:
       name: Zone
-      description: Replacement zone entity. Omit to leave unchanged.
+      description: >-
+        Replacement place name or zone entity_id. Pass the spoken place name
+        directly — the integration fuzzy-matches it. Omit to leave unchanged.
       required: false
-      example: zone.work
+      example: Bruciato
       selector:
-        entity:
-          domain: zone
+        text:
     trigger:
       name: Trigger
       description: Replacement trigger (enter or leave). Omit to leave unchanged.

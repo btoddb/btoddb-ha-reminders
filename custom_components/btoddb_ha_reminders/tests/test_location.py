@@ -11,6 +11,7 @@ LocationReminder = location.LocationReminder
 transition_kind = location.transition_kind
 triggered = location.triggered
 format_spoken_location = location.format_spoken_location
+resolve_zone = location.resolve_zone
 ENTER = location.ENTER
 LEAVE = location.LEAVE
 
@@ -128,6 +129,67 @@ def test_spoken_location_verbatim_zone_label():
     # Zone label is passed in as-is (friendly name or best-effort slug); the function
     # must not transform it.
     assert format_spoken_location(LEAVE, "The Gym") == "when you leave The Gym"
+
+
+# --- resolve_zone -----------------------------------------------------------------
+
+_ZONES = {
+    "zone.work": "Work",
+    "zone.bruciato": "Bruciato",
+    "zone.agate": "Agate",
+    "zone.docs_marina_grill": "Doc's Marina Grill",
+}
+
+
+def test_resolve_zone_exact_entity_id():
+    assert resolve_zone("zone.work", _ZONES) == "zone.work"
+
+
+def test_resolve_zone_exact_friendly_name():
+    assert resolve_zone("Work", _ZONES) == "zone.work"
+
+
+def test_resolve_zone_case_insensitive():
+    assert resolve_zone("work", _ZONES) == "zone.work"
+    assert resolve_zone("AGATE", _ZONES) == "zone.agate"
+
+
+def test_resolve_zone_slug_match():
+    # Normalized slug "agate" matches zone.agate
+    assert resolve_zone("agate", _ZONES) == "zone.agate"
+
+
+def test_resolve_zone_fuzzy_mishearing():
+    # "Bruciado" is a common STT mishearing of "Bruciato" (d/t swap)
+    assert resolve_zone("Bruciado", _ZONES) == "zone.bruciato"
+
+
+def test_resolve_zone_punctuation_normalized():
+    # "Docks Marina Grill" should match "Doc's Marina Grill" (apostrophe stripped)
+    assert resolve_zone("Docks Marina Grill", _ZONES) == "zone.docs_marina_grill"
+
+
+def test_resolve_zone_no_match():
+    assert resolve_zone("Completely Unknown Place", _ZONES) is None
+
+
+def test_resolve_zone_empty_spoken():
+    assert resolve_zone("", _ZONES) is None
+
+
+def test_resolve_zone_ambiguous():
+    # Two zones equidistant from the spoken input — should decline to guess
+    zones = {
+        "zone.acme_branch_alpha": "Acme Branch Alpha",
+        "zone.acme_branch_beta": "Acme Branch Beta",
+    }
+    # "Acme Branch" is a prefix of both; both score ~0.786 and ~0.815,
+    # within the 0.08 margin so the result must be None rather than a guess.
+    assert resolve_zone("Acme Branch", zones) is None
+
+
+def test_resolve_zone_empty_zone_list():
+    assert resolve_zone("Work", {}) is None
 
 
 # --- retention predicate (mirrors LocationReminderStore.async_prune) --------------

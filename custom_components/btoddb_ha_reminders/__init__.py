@@ -73,6 +73,7 @@ from .delivery import (
 from .location import (
     LocationReminder,
     format_spoken_location,
+    resolve_zone,
     transition_kind,
     triggered,
 )
@@ -176,10 +177,11 @@ UPDATE_SCHEMA = vol.Schema(
 CREATE_LOCATION_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_MESSAGE): cv.string,
-        # Restrict to the actual domains (LOC-1): cv.entity_id alone would accept e.g.
-        # sensor.foo, creating a reminder that can never fire.
+        # person must still be a real entity_id (LOC-1) — the model always knows the
+        # person entity.  zone is now a free string so the conversation agent can pass
+        # the spoken place name; _resolve_zone_arg() does the fuzzy matching at runtime.
         vol.Required(ATTR_PERSON): cv.entity_domain("person"),
-        vol.Required(ATTR_ZONE): cv.entity_domain("zone"),
+        vol.Required(ATTR_ZONE): cv.string,
         vol.Required(ATTR_TRIGGER): vol.In(TRIGGER_VALUES),
         vol.Optional(ATTR_PERSISTENT, default=False): cv.boolean,
     }
@@ -190,7 +192,7 @@ UPDATE_LOCATION_SCHEMA = vol.Schema(
         vol.Required(ATTR_UID): cv.string,
         vol.Optional(ATTR_MESSAGE): cv.string,
         vol.Optional(ATTR_PERSON): cv.entity_domain("person"),
-        vol.Optional(ATTR_ZONE): cv.entity_domain("zone"),
+        vol.Optional(ATTR_ZONE): cv.string,
         vol.Optional(ATTR_TRIGGER): vol.In(TRIGGER_VALUES),
         vol.Optional(ATTR_PERSISTENT): cv.boolean,
     }
@@ -277,6 +279,30 @@ def _notify_target_for(entry: ConfigEntry) -> tuple[str, str]:
         or ""
     )
     return resolve_notify_target(configured)
+
+
+def _resolve_zone_arg(hass: HomeAssistant, zone_input: str) -> str:
+    """
+    Resolve a spoken place name (or a literal zone entity_id) to a canonical zone id.
+
+    Accepts anything the conversation agent might send — a friendly name ("Bruciato"),
+    a mis-transcribed name ("Bruciado"), a slug ("work"), or a proper entity_id
+    ("zone.work") — and fuzzy-matches it against every zone currently registered in HA.
+
+    Calls ``_reject_input`` (raises ``vol.Invalid``) on no match, listing available
+    zones so the agent can re-ask intelligently.
+    """
+    zones: dict[str, str] = {
+        state.entity_id: (state.attributes.get("friendly_name") or "")
+        for state in hass.states.async_all("zone")
+    }
+    resolved = resolve_zone(zone_input, zones)
+    if resolved is not None:
+        return resolved
+    available = ", ".join(sorted(zones.keys())) if zones else "none configured"
+    _reject_input(
+        f"Could not match {zone_input!r} to a zone. Available zones: {available}."
+    )
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -598,7 +624,7 @@ def _async_register_location_services(
 
     async def _handle_create_location(call: ServiceCall) -> ServiceResponse:
         message: str = call.data[ATTR_MESSAGE]
-        zone: str = call.data[ATTR_ZONE]
+        zone: str = _resolve_zone_arg(hass, call.data[ATTR_ZONE])
         trigger: str = call.data[ATTR_TRIGGER]
         reminder = LocationReminder(
             uid=uuid.uuid4().hex,
@@ -626,7 +652,10 @@ def _async_register_location_services(
             _reject_input(msg)
         message: str | None = call.data.get(ATTR_MESSAGE)
         person: str | None = call.data.get(ATTR_PERSON)
-        zone: str | None = call.data.get(ATTR_ZONE)
+        zone_raw: str | None = call.data.get(ATTR_ZONE)
+        zone: str | None = (
+            _resolve_zone_arg(hass, zone_raw) if zone_raw is not None else None
+        )
         trigger: str | None = call.data.get(ATTR_TRIGGER)
         persistent: bool | None = call.data.get(ATTR_PERSISTENT)
         if (
