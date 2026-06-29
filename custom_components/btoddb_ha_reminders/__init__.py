@@ -70,7 +70,12 @@ from .delivery import (
     snoozed_event,
     validate_rrule,
 )
-from .location import LocationReminder, transition_kind, triggered
+from .location import (
+    LocationReminder,
+    format_spoken_location,
+    transition_kind,
+    triggered,
+)
 from .location_store import LocationReminderStore
 from .spoken_time import format_spoken_time
 from .store import ReminderStore
@@ -598,16 +603,24 @@ def _async_register_location_services(
     if hass.services.has_service(DOMAIN, SERVICE_CREATE_LOCATION):
         return
 
-    async def _handle_create_location(call: ServiceCall) -> None:
+    async def _handle_create_location(call: ServiceCall) -> ServiceResponse:
+        message: str = call.data[ATTR_MESSAGE]
+        zone: str = call.data[ATTR_ZONE]
+        trigger: str = call.data[ATTR_TRIGGER]
         reminder = LocationReminder(
             uid=uuid.uuid4().hex,
-            summary=call.data[ATTR_MESSAGE],
+            summary=message,
             person=call.data[ATTR_PERSON],
-            zone=call.data[ATTR_ZONE],
-            trigger=call.data[ATTR_TRIGGER],
+            zone=zone,
+            trigger=trigger,
             persistent=call.data.get(ATTR_PERSISTENT, False),
         )
         await store.async_add_event(reminder)
+        return {
+            "success": True,
+            "message": message,
+            "start": format_spoken_location(trigger, _zone_value(hass, zone)),
+        }
 
     async def _handle_update_location(call: ServiceCall) -> None:
         uid: str = call.data[ATTR_UID]
@@ -649,6 +662,7 @@ def _async_register_location_services(
         SERVICE_CREATE_LOCATION,
         _handle_create_location,
         schema=CREATE_LOCATION_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
     )
     hass.services.async_register(
         DOMAIN,

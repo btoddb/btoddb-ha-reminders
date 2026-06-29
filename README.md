@@ -23,7 +23,9 @@ difference between reminders that work and reminders that randomly fail.**
 - **`btoddb_ha_reminders.create_location`** service — `message`, `person` entity, `zone`
   entity, `trigger` (`enter` or `leave`). Fires the moment the person enters or leaves
   that zone. Set `persistent: true` to re-fire on every matching transition rather than
-  just once.
+  just once. Returns `{success, message, start}` when called with `response_variable`
+  (same pattern as `create`); `start` is a spoken phrase ("when you leave Work") the
+  agent can echo back.
 - **`calendar.btoddb_reminders`** — a calendar entity listing upcoming time-based reminders.
 - **`sensor.btoddb_location_reminders`** — exposes active and recently-delivered location
   reminders; the dashboard card reads from this entity.
@@ -157,6 +159,25 @@ an automation that sends a non-empty `input_text` value to `conversation.process
 (prefixed e.g. `Set a reminder:`) and then clears the box — and put that box plus a
 calendar card bound to `calendar.btoddb_reminders` on a dashboard. The typed path must go
 through the agent (the LLM does the parsing); the component can't parse language itself.
+
+### 9. (Optional) Voice for location reminders
+
+To set location reminders by voice ("remind me to grab the dry cleaning when I leave
+work"), add `create_location_reminder` as a second agent function alongside
+`create_reminder`:
+
+1. Paste [`examples/create_location.function.yaml`](examples/create_location.function.yaml)
+   into the agent's **functions** field (same place as `create_reminder`).
+2. Add the location-specific lines from
+   [`examples/prompt-snippet.txt`](examples/prompt-snippet.txt) (the block after the
+   "Location reminders" comment) to your system prompt. These render live lists of your
+   `person.*` and `zone.*` entities so the model picks real ids instead of inventing them.
+3. Expose your `person.*` and `zone.*` entities to the conversation assistant so the
+   rendered lists are non-empty.
+
+The same rules apply as for `create_reminder`: use `response_variable` (already in the
+example), and the model echoes `start` verbatim — it's already a natural phrase like
+"when you leave Work".
 
 ### Keep your prompt/functions under version control
 
