@@ -81,8 +81,8 @@ Both cards compile into the single `btoddb-ha-reminders.js` bundle and are regis
 - Edit only the TypeScript in `src/*.ts`. **Never hand-edit** the generated
   `../www/btoddb-ha-reminders.js` bundle (or its `.map`).
 - `src/index.ts` is the entry: console banner + `customCards` registration. Its first
-  `vX.Y.Z` string is the version `scripts/deploy.sh` bumps — don't edit it by hand.
-- Build + deploy with `scripts/deploy.sh` from the repo root: it `npm install`s, bumps
+  `vX.Y.Z` string is the version `scripts/deploy-card` bumps — don't edit it by hand.
+- Build + deploy with `scripts/deploy-card` from the repo root: it `npm install`s, bumps
   the patch version in `package.json` (and syncs the banner), runs `npm run build`
   (esbuild → `btoddb-ha-reminders.js` + `.map`), and copies the bundle into `../www/`.
 - The integration serves `../www/` at `/btoddb-ha-reminders/` and auto-registers it
@@ -91,5 +91,5 @@ Both cards compile into the single `btoddb-ha-reminders.js` bundle and are regis
 
 ## Versioning
 
-`package.json` (`X.Y.Z`, plain) is bumped **only** by `scripts/deploy.sh`. This is
+`package.json` (`X.Y.Z`, plain) is bumped **only** by `scripts/deploy-card`. This is
 independent of the integration's `manifest.json` version.

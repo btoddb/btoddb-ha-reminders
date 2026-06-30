@@ -42,7 +42,7 @@ commit a diff outside `btoddb_ha_reminders`.
 - **Hassfest locally (Docker):** `scripts/validate` runs CI's Hassfest check
   (`ghcr.io/home-assistant/hassfest`) against the working tree — use it to catch
   manifest/dependency/translation errors before pushing. Requires Docker.
-- **Build the card:** `scripts/deploy.sh` builds, bumps the version, and copies
+- **Build the card:** `scripts/deploy-card` builds, bumps the version, and copies
   into `www/`. Edit the TypeScript source at
   `custom_components/btoddb_ha_reminders/card/src/*.ts` — never hand-edit the
   generated `www/*.js` bundle. (Card-specific guidance lives in that folder's
@@ -54,7 +54,7 @@ There are **two independent version numbers** — never hand-edit either:
 
 - **Integration:** `manifest.json` (`"version": "vX.Y.Z"` — the leading `v` is
   intentional). Bumped only by `scripts/create-release.sh`.
-- **Card:** `card/package.json` (plain `X.Y.Z`). Bumped only by `scripts/deploy.sh`,
+- **Card:** `card/package.json` (plain `X.Y.Z`). Bumped only by `scripts/deploy-card`,
   which also syncs the console banner in `card/src/index.ts`.
 <!--
   DON'T EDIT BELOW THIS COMMENT, THIS PART SHOULD BE COPIED FROM THE WORKFLOW PIPELINE (btoddb/claude-pipeline)
@@ -151,7 +151,7 @@ out, so GitHub CLI never prompts or fails for missing required input in CI.
 
 ### Revision (Sonnet)
 - `@claude revise <feedback>` runs on an **open PR** and is the only PR command that changes code. It checks out the PR's head branch, applies the requested changes, and commits **to that same branch** — it does not open a new PR.
-- It shares `implement`'s toolset (the `IMPL_TOOLS` list in the workflow + the repo's `implement-allowed-tools`) and runs the same language **setup + install** steps, so lint, tests, `scripts/deploy.sh`, and `npm` are all available while iterating.
+- It shares `implement`'s toolset (the `IMPL_TOOLS` list in the workflow + the repo's `implement-allowed-tools`) and runs the same language **setup + install** steps, so lint, tests, `scripts/deploy-card`, and `npm` are all available while iterating.
 - It can file follow-up issues with `gh issue create` for work discovered while revising that does not belong in the current PR.
 - **constraint** Read the PR thread and the triggering comment first; make the change the feedback asks for, then push it to the PR branch. Don't open a second PR for the same work.
 

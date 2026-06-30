@@ -423,7 +423,7 @@ async def _async_register_card(hass: HomeAssistant) -> None:
     """
     www_dir = Path(__file__).parent / "www"
     # Ensure the directory exists so registering the static route never fails before
-    # the card has been built/deployed (scripts/deploy.sh fills it in).
+    # the card has been built/deployed (scripts/deploy-card fills it in).
     await hass.async_add_executor_job(
         lambda: www_dir.mkdir(parents=True, exist_ok=True)
     )

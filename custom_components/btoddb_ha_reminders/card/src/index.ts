@@ -4,7 +4,7 @@
 // resource, so loading it just needs a browser hard-refresh — no manual resource
 // to add.
 //
-// The version string below is bumped automatically by scripts/deploy.sh (it greps
+// The version string below is bumped automatically by scripts/deploy-card (it greps
 // for the first `vX.Y.Z`), so you can confirm in the console which build loaded.
 
 import "./calendar-list-card";
