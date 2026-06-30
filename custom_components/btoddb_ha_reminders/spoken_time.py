@@ -18,6 +18,26 @@ if TYPE_CHECKING:
 # one occurrence), so the month/day is spelled out too.
 WEEKDAY_NAME_HORIZON_DAYS = 7
 
+# RRULE BYDAY codes to spoken weekday names. Mirrors the BYDAY set accepted by
+# ``delivery.validate_rrule``; kept local so this module stays HA/engine-import-free.
+_BYDAY_TO_NAME: dict[str, str] = {
+    "MO": "Monday",
+    "TU": "Tuesday",
+    "WE": "Wednesday",
+    "TH": "Thursday",
+    "FR": "Friday",
+    "SA": "Saturday",
+    "SU": "Sunday",
+}
+
+
+def _format_clock(dt: datetime) -> str:
+    """Spoken clock time — "6 PM" on the hour, "6:30 PM" otherwise."""
+    minute = dt.strftime("%M")
+    hour = int(dt.strftime("%I"))
+    meridiem = dt.strftime("%p")
+    return f"{hour} {meridiem}" if minute == "00" else f"{hour}:{minute} {meridiem}"
+
 
 def format_spoken_time(dt: datetime, now: datetime) -> str:
     """
@@ -31,10 +51,7 @@ def format_spoken_time(dt: datetime, now: datetime) -> str:
 
     Both arguments are expected to be timezone-aware local datetimes.
     """
-    minute = dt.strftime("%M")
-    hour = int(dt.strftime("%I"))
-    meridiem = dt.strftime("%p")
-    clock = f"{hour} {meridiem}" if minute == "00" else f"{hour}:{minute} {meridiem}"
+    clock = _format_clock(dt)
 
     days_out = (dt.date() - now.date()).days
     if days_out == 0:
@@ -49,6 +66,34 @@ def format_spoken_time(dt: datetime, now: datetime) -> str:
     return f"{day} at {clock}"
 
 
+def format_recurrence(start: datetime, now: datetime, rrule: str) -> str:
+    """
+    Render a recurring reminder's cadence ("every day at 2 PM").
+
+    Covers the rrule shapes the engine actually accepts (``FREQ=DAILY`` and
+    ``FREQ=WEEKLY`` with optional ``BYDAY`` — see ``delivery.validate_rrule``);
+    anything else falls back to the one-shot spoken time for ``start``.
+    """
+    parts: dict[str, str] = {}
+    for token in rrule.upper().split(";"):
+        if "=" in token:
+            key, _, value = token.partition("=")
+            parts[key.strip()] = value.strip()
+
+    clock = _format_clock(start)
+    freq = parts.get("FREQ")
+    if freq == "DAILY":
+        return f"every day at {clock}"
+    if freq == "WEEKLY":
+        byday = parts.get("BYDAY")
+        weekday = _BYDAY_TO_NAME.get(byday) if byday else None
+        if weekday is None:
+            weekday = start.strftime("%A")
+        return f"every {weekday} at {clock}"
+
+    return format_spoken_time(start, now)
+
+
 def _build_response(
     message: str,
     start: datetime,
@@ -57,7 +102,11 @@ def _build_response(
     rrule: str | None = None,
 ) -> dict[str, object]:
     """Build the service response handed back to conversation agents."""
-    spoken_start = format_spoken_time(start, now)
+    spoken_start = (
+        format_recurrence(start, now, rrule)
+        if rrule is not None
+        else format_spoken_time(start, now)
+    )
     response: dict[str, object] = {
         "success": True,
         "message": message,
