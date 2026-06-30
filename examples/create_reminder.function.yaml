@@ -19,7 +19,10 @@
 # model will claim they are impossible unless the function schema exposes an explicit
 # recurrence argument. For "every day at 2 PM", pass the next 2 PM as `when` and
 # `rrule: FREQ=DAILY`; for "every Monday at 9 AM", pass the next Monday at 9 AM and
-# `rrule: FREQ=WEEKLY;BYDAY=MO`.
+# `rrule: FREQ=WEEKLY;BYDAY=MO`. For "every other"/"every Nth" cadences, append
+# `;INTERVAL=N` — "every week" -> omit (or INTERVAL=1), "every other week" ->
+# INTERVAL=2, "every third week" -> INTERVAL=3, "every fourth week" -> INTERVAL=4,
+# etc; the same mapping applies to daily.
 
 - spec:
     name: create_reminder
@@ -33,7 +36,10 @@
       requests, do not refuse: pass when as the first desired occurrence and pass
       rrule as "FREQ=DAILY" for "every day"/"daily", or
       "FREQ=WEEKLY;BYDAY=MO" for "every Monday"/weekly requests (replace MO with
-      TU/WE/TH/FR/SA/SU as needed). Always pass message, and put ONLY the task in
+      TU/WE/TH/FR/SA/SU as needed). For "every other"/"every Nth" cadences append
+      ";INTERVAL=N" to rrule: "every other week" -> INTERVAL=2, "every third week"
+      -> INTERVAL=3, "every fourth week" -> INTERVAL=4, etc (same for daily).
+      Always pass message, and put ONLY the task in
       it — strip the "remind me" framing and the schedule. From "remind me every
       day at noon to drink a beer" pass message "drink a beer" (the "every day"
       and "noon" go in rrule and when), NOT "remind me every day at noon to drink
@@ -61,7 +67,7 @@
             "tomorrow", or "at 6pm" — those belong in when / in_minutes / rrule.
         rrule:
           type: string
-          description: Optional recurrence rule. Use FREQ=DAILY for "every day"/"daily"; use FREQ=WEEKLY;BYDAY=MO for weekly reminders, replacing MO with TU/WE/TH/FR/SA/SU. Set when to the first occurrence. Omit for one-time reminders.
+          description: Optional recurrence rule. Use FREQ=DAILY for "every day"/"daily"; use FREQ=WEEKLY;BYDAY=MO for weekly reminders, replacing MO with TU/WE/TH/FR/SA/SU. For "every other"/"every Nth" cadences append ";INTERVAL=N" ("every other week" -> INTERVAL=2, "every third week" -> INTERVAL=3, "every fourth week" -> INTERVAL=4, etc; same for daily). Set when to the first occurrence. Omit for one-time reminders.
       required: [message]
   function:
     type: script

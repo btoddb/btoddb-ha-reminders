@@ -145,3 +145,45 @@ def test_format_recurrence_falls_back_for_unsupported_freq():
     assert format_recurrence(_at(2026, 6, 22, 9), NOW, "FREQ=MONTHLY") == (
         format_spoken_time(_at(2026, 6, 22, 9), NOW)
     )
+
+
+def test_format_recurrence_daily_interval_one_is_unchanged():
+    assert format_recurrence(_at(2026, 6, 22, 14), NOW, "FREQ=DAILY;INTERVAL=1") == (
+        "every day at 2 PM"
+    )
+
+
+def test_format_recurrence_daily_interval_two_is_every_other_day():
+    assert format_recurrence(_at(2026, 6, 22, 14), NOW, "FREQ=DAILY;INTERVAL=2") == (
+        "every other day at 2 PM"
+    )
+
+
+def test_format_recurrence_daily_interval_three_is_every_third_day():
+    assert format_recurrence(_at(2026, 6, 22, 14), NOW, "FREQ=DAILY;INTERVAL=3") == (
+        "every third day at 2 PM"
+    )
+
+
+def test_format_recurrence_weekly_interval_two_is_every_other_weekday():
+    assert format_recurrence(
+        _at(2026, 6, 22, 9), NOW, "FREQ=WEEKLY;BYDAY=MO;INTERVAL=2"
+    ) == ("every other Monday at 9 AM")
+
+
+def test_format_recurrence_weekly_interval_three_is_every_third_weekday():
+    assert format_recurrence(
+        _at(2026, 6, 22, 9), NOW, "FREQ=WEEKLY;BYDAY=MO;INTERVAL=3"
+    ) == ("every third Monday at 9 AM")
+
+
+def test_format_recurrence_weekly_interval_four_uses_ordinal_word():
+    assert format_recurrence(
+        _at(2026, 6, 22, 9), NOW, "FREQ=WEEKLY;BYDAY=MO;INTERVAL=4"
+    ) == ("every fourth Monday at 9 AM")
+
+
+def test_format_recurrence_weekly_interval_large_uses_numeric_ordinal():
+    assert format_recurrence(
+        _at(2026, 6, 22, 9), NOW, "FREQ=WEEKLY;BYDAY=MO;INTERVAL=11"
+    ) == ("every 11th Monday at 9 AM")

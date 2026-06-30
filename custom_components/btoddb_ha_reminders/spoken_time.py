@@ -66,13 +66,53 @@ def format_spoken_time(dt: datetime, now: datetime) -> str:
     return f"{day} at {clock}"
 
 
+# Ordinal words for INTERVAL spoken phrasing ("every other week", "every third week").
+# INTERVAL=1 never reaches this map; that's the bare "every ___" case.
+_INTERVAL_ORDINALS: dict[int, str] = {
+    2: "other",
+    3: "third",
+    4: "fourth",
+    5: "fifth",
+    6: "sixth",
+    7: "seventh",
+    8: "eighth",
+    9: "ninth",
+    10: "tenth",
+}
+
+# English ordinal suffixes are "th" for the teens (11th-20th), regardless of the
+# trailing digit (which would otherwise suggest "st"/"nd"/"rd" for 11/12/13).
+_ORDINAL_TEENS_LOW = 10
+_ORDINAL_TEENS_HIGH = 20
+
+
+def _ordinal(n: int) -> str:
+    """Spoken ordinal for an arbitrary INTERVAL, e.g. 11 -> "11th", 22 -> "22nd"."""
+    word = _INTERVAL_ORDINALS.get(n)
+    if word is not None:
+        return word
+    if _ORDINAL_TEENS_LOW <= n % 100 <= _ORDINAL_TEENS_HIGH:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
+
+
+def _interval_prefix(interval: int) -> str:
+    """Cadence prefix: "every", "every other", "every third", "every 11th", etc."""
+    if interval <= 1:
+        return "every"
+    return f"every {_ordinal(interval)}"
+
+
 def format_recurrence(start: datetime, now: datetime, rrule: str) -> str:
     """
-    Render a recurring reminder's cadence ("every day at 2 PM").
+    Render a recurring reminder's cadence ("every day at 2 PM", "every other week...").
 
     Covers the rrule shapes the engine actually accepts (``FREQ=DAILY`` and
-    ``FREQ=WEEKLY`` with optional ``BYDAY`` — see ``delivery.validate_rrule``);
-    anything else falls back to the one-shot spoken time for ``start``.
+    ``FREQ=WEEKLY`` with optional ``BYDAY``, both with optional ``INTERVAL`` — see
+    ``delivery.validate_rrule``); anything else falls back to the one-shot spoken
+    time for ``start``.
     """
     parts: dict[str, str] = {}
     for token in rrule.upper().split(";"):
@@ -82,14 +122,17 @@ def format_recurrence(start: datetime, now: datetime, rrule: str) -> str:
 
     clock = _format_clock(start)
     freq = parts.get("FREQ")
+    interval_raw = parts.get("INTERVAL")
+    interval = int(interval_raw) if interval_raw else 1
+    prefix = _interval_prefix(interval)
     if freq == "DAILY":
-        return f"every day at {clock}"
+        return f"{prefix} day at {clock}"
     if freq == "WEEKLY":
         byday = parts.get("BYDAY")
         weekday = _BYDAY_TO_NAME.get(byday) if byday else None
         if weekday is None:
             weekday = start.strftime("%A")
-        return f"every {weekday} at {clock}"
+        return f"{prefix} {weekday} at {clock}"
 
     return format_spoken_time(start, now)
 

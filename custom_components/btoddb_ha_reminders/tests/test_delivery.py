@@ -218,11 +218,8 @@ def test_validate_rrule_unknown_byday_returns_error():
     assert "XX" in err
 
 
-def test_validate_rrule_daily_with_interval_rejected():
-    # INTERVAL is not honoured by advance_recurring; reject it explicitly.
-    err = validate_rrule("FREQ=DAILY;INTERVAL=3", NOW)
-    assert err is not None
-    assert "INTERVAL" in err
+def test_validate_rrule_daily_with_interval_ok():
+    assert validate_rrule("FREQ=DAILY;INTERVAL=3", NOW) is None
 
 
 def test_validate_rrule_daily_with_count_rejected():
@@ -231,8 +228,24 @@ def test_validate_rrule_daily_with_count_rejected():
     assert "COUNT" in err
 
 
-def test_validate_rrule_weekly_with_interval_rejected():
-    err = validate_rrule("FREQ=WEEKLY;BYDAY=SU;INTERVAL=2", NOW)
+def test_validate_rrule_weekly_with_interval_ok():
+    assert validate_rrule("FREQ=WEEKLY;BYDAY=SU;INTERVAL=2", NOW) is None
+
+
+def test_validate_rrule_interval_zero_rejected():
+    err = validate_rrule("FREQ=DAILY;INTERVAL=0", NOW)
+    assert err is not None
+    assert "INTERVAL" in err
+
+
+def test_validate_rrule_interval_negative_rejected():
+    err = validate_rrule("FREQ=WEEKLY;INTERVAL=-1", NOW)
+    assert err is not None
+    assert "INTERVAL" in err
+
+
+def test_validate_rrule_interval_non_numeric_rejected():
+    err = validate_rrule("FREQ=DAILY;INTERVAL=abc", NOW)
     assert err is not None
     assert "INTERVAL" in err
 
@@ -243,17 +256,43 @@ def test_validate_rrule_loose_substring_not_accepted():
     assert err is not None
 
 
-def test_advance_recurring_daily_interval_ignored_returns_none():
-    # After the fix, an rrule with INTERVAL is invalid at create time, but if one
-    # somehow reaches advance_recurring, FREQ=DAILY is still honoured (only the
-    # FREQ key drives the step; unknown parts are silently ignored here).
+def test_advance_recurring_daily_interval_three_adds_three_days():
+    event = _recurring_ev("FREQ=DAILY;INTERVAL=3")
+    nxt = advance_recurring(event, NOW)
+    assert nxt is not None
+    assert nxt.start == NOW + timedelta(days=3)
+
+
+def test_advance_recurring_weekly_interval_two_adds_two_weeks():
+    event = _recurring_ev("FREQ=WEEKLY;BYDAY=SU;INTERVAL=2")
+    nxt = advance_recurring(event, NOW)
+    assert nxt is not None
+    assert nxt.start == NOW + timedelta(weeks=2)
+
+
+def test_advance_recurring_weekly_interval_default_is_one():
+    event = _recurring_ev("FREQ=WEEKLY;BYDAY=SU")
+    nxt = advance_recurring(event, NOW)
+    assert nxt is not None
+    assert nxt.start == NOW + timedelta(weeks=1)
+
+
+def test_advance_recurring_weekly_interval_self_heals_in_phase():
+    # Missed 5 weeks (an odd multiple of the 2-week interval plus a partial step);
+    # the self-heal loop must land on a slot that is still in phase with the
+    # original anchor, i.e. an exact multiple of INTERVAL weeks later.
+    old_start = NOW - timedelta(weeks=5)
     event = ReminderEvent(
-        uid="r1", summary="test", start=NOW, rrule="FREQ=DAILY;INTERVAL=3"
+        uid="r3",
+        summary="trash",
+        start=old_start,
+        rrule="FREQ=WEEKLY;BYDAY=SU;INTERVAL=2",
     )
     nxt = advance_recurring(event, NOW)
-    # advance_recurring extracts FREQ=DAILY and advances by 1 day regardless.
     assert nxt is not None
-    assert nxt.start == NOW + timedelta(days=1)
+    assert nxt.start > NOW
+    delta = nxt.start - old_start
+    assert delta.days % 14 == 0
 
 
 # ---------------------------------------------------------------------------

@@ -228,6 +228,7 @@ export class BtoddbRemindersCard extends LitElement {
     _repeatOpen: { state: true },
     _freq: { state: true },
     _weekday: { state: true },
+    _interval: { state: true },
     _locMessage: { state: true },
     _locPerson: { state: true },
     _locZone: { state: true },
@@ -247,6 +248,7 @@ export class BtoddbRemindersCard extends LitElement {
   private _repeatOpen = false;
   private _freq: "daily" | "weekly" = "daily";
   private _weekday = "MO";
+  private _interval = 1;
   private _locMessage = "";
   private _locPerson = "";
   private _locZone = "";
@@ -358,8 +360,9 @@ export class BtoddbRemindersCard extends LitElement {
   /** Build the RRULE string from current UI state; "" when repeat is off. */
   private _buildRrule(): string {
     if (!this._repeatOpen) return "";
-    if (this._freq === "daily") return "FREQ=DAILY";
-    return `FREQ=WEEKLY;BYDAY=${this._weekday}`;
+    const suffix = this._interval > 1 ? `;INTERVAL=${this._interval}` : "";
+    if (this._freq === "daily") return `FREQ=DAILY${suffix}`;
+    return `FREQ=WEEKLY;BYDAY=${this._weekday}${suffix}`;
   }
 
   /**
@@ -435,6 +438,7 @@ export class BtoddbRemindersCard extends LitElement {
       this._repeatOpen = false;
       this._freq = "daily";
       this._weekday = "MO";
+      this._interval = 1;
       await this._fetch();
       this._notifyTimeRemindersChanged();
     } catch (err) {
@@ -516,6 +520,8 @@ export class BtoddbRemindersCard extends LitElement {
     if (item.rrule) {
       this._repeatOpen = true;
       const upper = item.rrule.toUpperCase();
+      const intervalMatch = upper.match(/INTERVAL=(\d+)/);
+      this._interval = intervalMatch ? parseInt(intervalMatch[1], 10) : 1;
       if (upper.includes("FREQ=WEEKLY")) {
         this._freq = "weekly";
         const match = upper.match(/BYDAY=(\w+)/);
@@ -528,6 +534,7 @@ export class BtoddbRemindersCard extends LitElement {
       this._repeatOpen = false;
       this._freq = "daily";
       this._weekday = "MO";
+      this._interval = 1;
     }
     this._error = "";
   }
@@ -550,6 +557,7 @@ export class BtoddbRemindersCard extends LitElement {
     this._repeatOpen = false;
     this._freq = "daily";
     this._weekday = "MO";
+    this._interval = 1;
     this._locMessage = "";
     this._locPerson = "";
     this._locZone = "";
@@ -665,21 +673,35 @@ export class BtoddbRemindersCard extends LitElement {
     return html`<div class="day-header">${this._formatDayHeader(d)}</div>`;
   }
 
-  /** Human-readable recurrence string, e.g. "Every day at 9:45 AM". */
+  /** "Every" / "Every other" / "Every 3rd" cadence prefix from an RRULE INTERVAL. */
+  private _intervalPrefix(upper: string): string {
+    const match = upper.match(/INTERVAL=(\d+)/);
+    const n = match ? parseInt(match[1], 10) : 1;
+    if (n <= 1) return "Every";
+    if (n === 2) return "Every other";
+    const suffix =
+      n % 100 >= 11 && n % 100 <= 13
+        ? "th"
+        : { 1: "st", 2: "nd", 3: "rd" }[n % 10] ?? "th";
+    return `Every ${n}${suffix}`;
+  }
+
+  /** Human-readable recurrence string, e.g. "Every other day at 9:45 AM". */
   private _formatRecurrence(rrule: string, start: Date): string {
     const time = start.toLocaleString(undefined, {
       hour: "numeric",
       minute: "2-digit",
     });
     const upper = rrule.toUpperCase();
-    if (upper.includes("FREQ=DAILY")) return `Every day at ${time}`;
+    const prefix = this._intervalPrefix(upper);
+    if (upper.includes("FREQ=DAILY")) return `${prefix} day at ${time}`;
     if (upper.includes("FREQ=WEEKLY")) {
       const match = upper.match(/BYDAY=(\w+)/);
       if (match) {
         const dayName = BYDAY_FULL[match[1]] ?? match[1];
-        return `Every ${dayName} at ${time}`;
+        return `${prefix} ${dayName} at ${time}`;
       }
-      return `Weekly at ${time}`;
+      return `${prefix === "Every" ? "Weekly" : `${prefix} week`} at ${time}`;
     }
     return rrule;
   }
@@ -713,6 +735,20 @@ export class BtoddbRemindersCard extends LitElement {
                   <option value="daily">Daily</option>
                   <option value="weekly">Weekly</option>
                 </select>
+                <span class="interval-label">every</span>
+                <input
+                  class="interval-input"
+                  type="number"
+                  min="1"
+                  .value=${String(this._interval)}
+                  @input=${(e: Event) => {
+                    const n = parseInt((e.target as HTMLInputElement).value, 10);
+                    this._interval = Number.isFinite(n) && n >= 1 ? n : 1;
+                  }}
+                />
+                <span class="interval-label"
+                  >${this._freq === "daily" ? "day(s)" : "week(s)"}</span
+                >
                 ${this._freq === "weekly"
                   ? html`
                       <div class="weekday-chips">
@@ -1249,6 +1285,23 @@ export class BtoddbRemindersCard extends LitElement {
       color-scheme: light dark;
       font-family: inherit;
       font-size: 14px;
+    }
+    .interval-input {
+      width: 48px;
+      height: 36px;
+      padding: 0 6px;
+      border: 1px solid var(--divider-color, #e0e0e0);
+      border-radius: 4px;
+      background: var(--card-background-color, #fff);
+      color: var(--primary-text-color, #212121);
+      color-scheme: light dark;
+      font-family: inherit;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    .interval-label {
+      color: var(--secondary-text-color, #727272);
+      font-size: 13px;
     }
     .weekday-chips {
       display: flex;

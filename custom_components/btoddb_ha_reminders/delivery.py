@@ -87,10 +87,17 @@ def _parse_rrule_parts(upper: str) -> dict[str, str]:
 
 
 _SUPPORTED_RRULE_MSG = (
-    "Supported: FREQ=DAILY, FREQ=WEEKLY (with optional BYDAY=MO/TU/WE/TH/FR/SA/SU)."
+    "Supported: FREQ=DAILY, FREQ=WEEKLY (with optional BYDAY=MO/TU/WE/TH/FR/SA/SU), "
+    "both with optional INTERVAL=<positive integer>."
 )
-_DAILY_ALLOWED_KEYS: frozenset[str] = frozenset({"FREQ"})
-_WEEKLY_ALLOWED_KEYS: frozenset[str] = frozenset({"FREQ", "BYDAY"})
+_DAILY_ALLOWED_KEYS: frozenset[str] = frozenset({"FREQ", "INTERVAL"})
+_WEEKLY_ALLOWED_KEYS: frozenset[str] = frozenset({"FREQ", "BYDAY", "INTERVAL"})
+
+
+def _interval(parts: dict[str, str]) -> int:
+    """Parse ``INTERVAL`` from already-validated rrule parts; defaults to 1."""
+    raw = parts.get("INTERVAL")
+    return int(raw) if raw is not None else 1
 
 
 def advance_recurring(event: ReminderEvent, now: datetime) -> ReminderEvent | None:
@@ -103,18 +110,20 @@ def advance_recurring(event: ReminderEvent, now: datetime) -> ReminderEvent | No
     outage) self-heals to the nearest future slot instead of staying stuck.
 
     Supported RRULE values:
-    - ``FREQ=DAILY`` — advance by one day per step
-    - ``FREQ=WEEKLY`` — advance by seven days per step; ``BYDAY`` is validated at
-      create time so the start date is always on the correct weekday
+    - ``FREQ=DAILY`` — advance by ``INTERVAL`` days per step (default 1)
+    - ``FREQ=WEEKLY`` — advance by ``INTERVAL`` weeks per step (default 1); ``BYDAY``
+      is validated at create time so the start date is always on the correct weekday,
+      and stepping by whole weeks preserves it
     """
     if event.rrule is None:
         return None
     parts = _parse_rrule_parts(event.rrule.upper())
     freq = parts.get("FREQ")
+    interval = _interval(parts)
     if freq == "DAILY":
-        step = timedelta(days=1)
+        step = timedelta(days=interval)
     elif freq == "WEEKLY":
-        step = timedelta(weeks=1)
+        step = timedelta(weeks=interval)
     else:
         return None
     nxt = event.start
@@ -123,19 +132,52 @@ def advance_recurring(event: ReminderEvent, now: datetime) -> ReminderEvent | No
     return dataclasses.replace(event, start=nxt)
 
 
+def _validate_interval(parts: dict[str, str]) -> str | None:
+    """Validate ``INTERVAL`` is a positive integer, if present."""
+    interval_raw = parts.get("INTERVAL")
+    if interval_raw is None:
+        return None
+    try:
+        valid = int(interval_raw) >= 1
+    except ValueError:
+        valid = False
+    if not valid:
+        return f"INTERVAL must be a positive integer, got {interval_raw!r}."
+    return None
+
+
+def _validate_byday(parts: dict[str, str], start: datetime) -> str | None:
+    """Validate ``BYDAY`` matches the weekday of ``start``, if present."""
+    byday = parts.get("BYDAY")
+    if byday is None:
+        return None
+    if byday not in _BYDAY_TO_WEEKDAY:
+        return f"Unknown BYDAY value {byday!r}. Use MO/TU/WE/TH/FR/SA/SU."
+    expected = _BYDAY_TO_WEEKDAY[byday]
+    if start.weekday() != expected:
+        actual = _BYDAY_NAMES[start.weekday()]
+        return (
+            f"BYDAY={byday} does not match the weekday of 'when' "
+            f"({actual}); set 'when' to a {byday} date."
+        )
+    return None
+
+
 def validate_rrule(rrule: str, start: datetime) -> str | None:
     """
     Validate an rrule string. Returns an error message, or ``None`` if valid.
 
     Supported:
-    - ``FREQ=DAILY``
-    - ``FREQ=WEEKLY`` with optional ``BYDAY=<MO|TU|WE|TH|FR|SA|SU>``
+    - ``FREQ=DAILY`` with optional ``INTERVAL=<positive integer>``
+    - ``FREQ=WEEKLY`` with optional ``BYDAY=<MO|TU|WE|TH|FR|SA|SU>`` and optional
+      ``INTERVAL=<positive integer>``
 
-    Unknown keys (e.g. ``INTERVAL``, ``COUNT``, ``UNTIL``) are rejected so that
+    ``INTERVAL=N`` means "every Nth occurrence" (1 = every day/week, 2 = every other,
+    3 = every third, ...). Unknown keys (e.g. ``COUNT``, ``UNTIL``) are rejected so that
     the RRULE string matches the integration's actual roll-forward behaviour.
 
     For ``FREQ=WEEKLY;BYDAY=X``, the weekday of ``start`` must match ``X`` so that
-    adding 7 days on each roll-forward keeps the event on the correct weekday.
+    adding 7*INTERVAL days on each roll-forward keeps the event on the correct weekday.
     """
     parts = _parse_rrule_parts(rrule.upper())
     freq = parts.get("FREQ")
@@ -152,20 +194,9 @@ def validate_rrule(rrule: str, start: datetime) -> str | None:
         unknown_str = ", ".join(sorted(unknown))
         return f"Unknown RRULE part(s) {unknown_str!r}. {_SUPPORTED_RRULE_MSG}"
 
-    if freq == "WEEKLY":
-        byday = parts.get("BYDAY")
-        if byday is not None:
-            if byday not in _BYDAY_TO_WEEKDAY:
-                return f"Unknown BYDAY value {byday!r}. Use MO/TU/WE/TH/FR/SA/SU."
-            expected = _BYDAY_TO_WEEKDAY[byday]
-            if start.weekday() != expected:
-                actual = _BYDAY_NAMES[start.weekday()]
-                return (
-                    f"BYDAY={byday} does not match the weekday of 'when' "
-                    f"({actual}); set 'when' to a {byday} date."
-                )
-
-    return None
+    return _validate_interval(parts) or (
+        _validate_byday(parts, start) if freq == "WEEKLY" else None
+    )
 
 
 def resolve_notify_target(configured: str) -> tuple[str, str]:

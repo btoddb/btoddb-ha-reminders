@@ -9,6 +9,11 @@ create:
     For recurring requests such as "every day at 2 PM", set when to the first
     desired occurrence and set rrule to "FREQ=DAILY". For weekly requests, set
     rrule to "FREQ=WEEKLY;BYDAY=MO" with the requested weekday.
+
+    For "every N weeks/days" cadences, add INTERVAL=N: "every week" -> omit
+    INTERVAL (or INTERVAL=1), "every other week" -> INTERVAL=2, "every third
+    week" -> INTERVAL=3, "every fourth week" -> INTERVAL=4, etc. Same mapping
+    applies to FREQ=DAILY ("every other day" -> INTERVAL=2, ...).
   fields:
     message:
       name: Message
@@ -46,9 +51,13 @@ create:
         iCalendar RRULE string for recurring reminders. Supported values:
         "FREQ=DAILY" (fires every day at the same time) or
         "FREQ=WEEKLY;BYDAY=MO" (fires every week on the same day — replace MO
-        with TU/WE/TH/FR/SA/SU for other weekdays). Set "when" to the first
-        desired occurrence; after each delivery the next occurrence is
-        scheduled automatically.
+        with TU/WE/TH/FR/SA/SU for other weekdays). Add ";INTERVAL=N" to skip
+        weeks/days: INTERVAL=1 (or omitted) means every week/day, INTERVAL=2
+        means every other week/day, INTERVAL=3 means every third week/day,
+        and so on — map "every other week" to INTERVAL=2, "every third week"
+        to INTERVAL=3, "every fourth week" to INTERVAL=4, etc. Set "when" to
+        the first desired occurrence; after each delivery the next occurrence
+        is scheduled automatically.
       required: false
       example: "FREQ=DAILY"
       selector:
@@ -100,7 +109,9 @@ update:
       name: Recurrence rule
       description: >-
         New RRULE for this reminder ("FREQ=DAILY", "FREQ=WEEKLY;BYDAY=MO", etc.).
-        Pass an empty string or null to convert a recurring reminder back to a
+        Add ";INTERVAL=N" for "every other"/"every Nth" week or day cadences
+        (INTERVAL=2 -> every other, INTERVAL=3 -> every third, etc.). Pass an
+        empty string or null to convert a recurring reminder back to a
         one-shot. Omit to leave the recurrence unchanged.
       required: false
       example: "FREQ=WEEKLY;BYDAY=MO"

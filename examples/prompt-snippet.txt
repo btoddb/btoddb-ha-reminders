@@ -33,6 +33,13 @@ call create_reminder with rrule. Use "FREQ=DAILY" for daily reminders. Use
 Set when to the first occurrence of the recurring schedule; for weekly
 reminders, when must fall on the same weekday as BYDAY.
 
+# Maps "every other"/"every Nth" cadence phrasing onto rrule's INTERVAL. (RM-5b)
+For "every week"/"every day" set INTERVAL=1 (or omit it); for "every other week"/
+"every other day" set INTERVAL=2; for "every third week"/"every third day" set
+INTERVAL=3; for "every fourth week"/"every fourth day" set INTERVAL=4; and so on for
+higher ordinals. Append it to rrule, e.g. "FREQ=WEEKLY;BYDAY=MO;INTERVAL=2" for
+"every other Monday".
+
 # Keeps fallback date/time wording human if the model does not echo the create_reminder
 # confirmation field. (NL-11)
 When you say a date or time out loud, speak it the way a person would — "six pm",

@@ -19,7 +19,9 @@ difference between reminders that work and reminders that randomly fail.**
   local datetime) **or** `in_minutes` (relative offset). Returns
   `{success, message, start, confirmation}`, where `confirmation` is a ready-to-say
   sentence for the agent to read back. Optional `rrule` param enables recurring
-  reminders (`FREQ=DAILY` / `FREQ=WEEKLY;BYDAY=MO`).
+  reminders (`FREQ=DAILY` / `FREQ=WEEKLY;BYDAY=MO`), with an optional `INTERVAL=N`
+  for "every other week"/"every N weeks" (or days) cadences — see
+  [§4a](#4a-route-recurring-reminders-through-rrule-never-refuse-them).
 - **`btoddb_ha_reminders.create_location`** service — `message`, `person` entity, `zone`
   entity, `trigger` (`enter` or `leave`). Fires the moment the person enters or leaves
   that zone. Set `persistent: true` to re-fire on every matching transition rather than
@@ -138,6 +140,14 @@ day at 2 PM to stand up and stretch"*, the agent should call `create_reminder` w
 weekday; `when` must fall on the same weekday as `BYDAY` or the call is rejected.
 The copied function schema includes `rrule`; without it, the model may
 incorrectly claim recurring reminders are not supported.
+
+**Every other week / every N weeks:** append `;INTERVAL=N` to `rrule` to skip
+weeks (or days for `FREQ=DAILY`) between occurrences — `INTERVAL=1` (or omitted)
+means every week, `INTERVAL=2` means every other week, `INTERVAL=3` means every
+third week, and so on. Voice mapping for the agent: "every week" -> omit/`INTERVAL=1`,
+"every other week" -> `INTERVAL=2`, "every third week" -> `INTERVAL=3`, "every
+fourth week" -> `INTERVAL=4`, etc. Example: "every other Monday at 9 AM" ->
+`rrule: FREQ=WEEKLY;BYDAY=MO;INTERVAL=2`.
 
 ### 5. Add the prompt lines that matter
 

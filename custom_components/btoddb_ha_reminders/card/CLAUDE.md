@@ -9,9 +9,10 @@ The Lovelace cards for the Reminders integration.
   calls the **response-only** `btoddb_ha_reminders.create` service (`returnResponse` must be
   `true`). The message uses a styled native `<input>` rather than `ha-textfield` so it
   always renders even where that HA element isn't loaded. A **Repeat** disclosure button
-  below the row expands to a frequency selector (Daily / Weekly) and, for Weekly, a row of
-  weekday chips (Sun–Sat); these build the `rrule` param (`FREQ=DAILY` or
-  `FREQ=WEEKLY;BYDAY=<MO|TU|…>`) passed to `create` / `update`.
+  below the row expands to a frequency selector (Daily / Weekly), an interval number input
+  ("every N day(s)/week(s)") and, for Weekly, a row of weekday chips (Sun–Sat); these build
+  the `rrule` param (`FREQ=DAILY` or `FREQ=WEEKLY;BYDAY=<MO|TU|…>`, with `;INTERVAL=N`
+  appended when the interval is greater than 1) passed to `create` / `update`.
 - **Location** add row (native text `input` + two `ha-entity-picker`s for person/zone + a
   native `<select>` for enter/leave + native `<button>`) calls
   `btoddb_ha_reminders.create_location`. The `persistent` flag (re-fire on every matching
