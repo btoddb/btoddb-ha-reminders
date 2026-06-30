@@ -907,7 +907,17 @@ export class BtoddbRemindersCard extends LitElement {
     `;
   }
 
-  private _renderLocationItem(item: LocationItem) {
+  /** Bold, labeled divider that splits the time reminders from the location reminders. */
+  private _renderSectionDivider() {
+    return html`
+      <div class="section-divider">
+        <ha-icon icon="mdi:map-marker"></ha-icon>
+        <span>Location</span>
+      </div>
+    `;
+  }
+
+  private _renderLocationItem(item: LocationItem, sectionFirst = false) {
     const verb = item.trigger === "enter" ? "Entering" : "Leaving";
     const where = `${verb} ${this._entityName(item.zone)} · ${this._entityName(
       item.person,
@@ -919,7 +929,7 @@ export class BtoddbRemindersCard extends LitElement {
       : where;
     const isPersistentActive = item.persistent && !item.deliveredAt;
     return html`
-      <div class="item ${isPersistentActive ? "persistent" : ""} ${item.deliveredAt ? "delivered" : ""}">
+      <div class="item ${isPersistentActive ? "persistent" : ""} ${item.deliveredAt ? "delivered" : ""} ${sectionFirst ? "section-first" : ""}">
         <ha-icon class="leading" icon=${isPersistentActive ? "mdi:map-marker-path" : "mdi:map-marker"}></ha-icon>
         <div class="text">
           <span class="summary">${item.summary}</span>
@@ -986,11 +996,11 @@ export class BtoddbRemindersCard extends LitElement {
         : html`
                 <div class="list">
                   ${this._renderTimeRows()}
-                  ${locUndelivered.map((item) =>
-          this._renderLocationItem(item),
-        )}
-                  ${locDelivered.map((item) =>
-          this._renderLocationItem(item),
+                  ${locItems.length && this._items.length
+          ? this._renderSectionDivider()
+          : nothing}
+                  ${[...locUndelivered, ...locDelivered].map((item, i) =>
+          this._renderLocationItem(item, this._items.length > 0 && i === 0),
         )}
                 </div>
               `}
@@ -1136,6 +1146,29 @@ export class BtoddbRemindersCard extends LitElement {
     }
     .item.day-first {
       border-top: none;
+    }
+    .item.section-first {
+      border-top: none;
+    }
+    /* Bold divider between the time and location reminder groups. */
+    .section-divider {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--secondary-text-color, #727272);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 10px 0 4px;
+      margin-top: 8px;
+      border-top: 3px double var(--divider-color, #e0e0e0);
+    }
+    .section-divider ha-icon {
+      --mdc-icon-size: 16px;
+      width: 16px;
+      height: 16px;
+      color: var(--secondary-text-color, #727272);
     }
     .leading {
       color: var(--state-icon-color, var(--primary-color, #03a9f4));
