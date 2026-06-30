@@ -27,18 +27,29 @@ never claim you couldn't set it. Put only the task in the message argument — f
 "every day"/"noon" schedule goes in rrule and when, not in the message.
 
 # Ensures recurring reminders are created instead of refused. (RM-5a)
-For recurring reminder requests ("every day", "daily", "weekly", "every Monday"),
+For recurring reminder requests ("every day", "daily", "weekly", "every Monday",
+"the 15th of every month", "first Friday of every month", "last day of the month"),
 call create_reminder with rrule. Use "FREQ=DAILY" for daily reminders. Use
 "FREQ=WEEKLY;BYDAY=MO" for weekly reminders, replacing MO with the requested weekday.
 Set when to the first occurrence of the recurring schedule; for weekly
 reminders, when must fall on the same weekday as BYDAY.
 
+# Monthly recurring reminders — three supported forms. (RM-5c)
+For monthly reminders, use one of these rrule forms:
+- Fixed day of month: "FREQ=MONTHLY;BYMONTHDAY=15" for "the 15th of every month"
+  (use days 1–28 only; do NOT use 29/30/31 — use BYMONTHDAY=-1 for "last day").
+- Last day of month: "FREQ=MONTHLY;BYMONTHDAY=-1" for "last day of every month".
+- Ordinal weekday: "FREQ=MONTHLY;BYDAY=1FR" for "first Friday of every month"
+  (prefix 1/2/3/4/-1 = first/second/third/fourth/last; MO/TU/WE/TH/FR/SA/SU).
+Set when to the first occurrence matching the chosen monthly form.
+
 # Maps "every other"/"every Nth" cadence phrasing onto rrule's INTERVAL. (RM-5b)
-For "every week"/"every day" set INTERVAL=1 (or omit it); for "every other week"/
-"every other day" set INTERVAL=2; for "every third week"/"every third day" set
-INTERVAL=3; for "every fourth week"/"every fourth day" set INTERVAL=4; and so on for
-higher ordinals. Append it to rrule, e.g. "FREQ=WEEKLY;BYDAY=MO;INTERVAL=2" for
-"every other Monday".
+For "every week"/"every day"/"every month" set INTERVAL=1 (or omit it); for "every
+other week"/"every other day"/"every other month" set INTERVAL=2; for "every third"
+set INTERVAL=3 (note: "quarterly" = FREQ=MONTHLY;INTERVAL=3); for "every fourth"
+set INTERVAL=4; and so on for higher ordinals. Append it to rrule, e.g.
+"FREQ=WEEKLY;BYDAY=MO;INTERVAL=2" for "every other Monday",
+"FREQ=MONTHLY;BYDAY=1FR;INTERVAL=3" for "first Friday of every quarter".
 
 # Keeps fallback date/time wording human if the model does not echo the create_reminder
 # confirmation field. (NL-11)
