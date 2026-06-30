@@ -33,10 +33,14 @@
       requests, do not refuse: pass when as the first desired occurrence and pass
       rrule as "FREQ=DAILY" for "every day"/"daily", or
       "FREQ=WEEKLY;BYDAY=MO" for "every Monday"/weekly requests (replace MO with
-      TU/WE/TH/FR/SA/SU as needed). Always pass message. The returned
-      confirmation field is already a natural spoken response (e.g. "Reminder set
-      for tomorrow at 6 PM: take out the trash") — repeat it back as-is, don't
-      reformat it.
+      TU/WE/TH/FR/SA/SU as needed). Always pass message, and put ONLY the task in
+      it — strip the "remind me" framing and the schedule. From "remind me every
+      day at noon to drink a beer" pass message "drink a beer" (the "every day"
+      and "noon" go in rrule and when), NOT "remind me every day at noon to drink
+      a beer". The returned confirmation field is already a natural spoken
+      response (e.g. "Reminder set for tomorrow at 6 PM: take out the trash") —
+      repeat it back as-is, don't reformat it. When the service returns success
+      the reminder IS set: never tell the user you couldn't set it.
     parameters:
       type: object
       properties:
@@ -48,7 +52,13 @@
           description: Minutes from now, for relative delays ("in 5 minutes" -> 5, "in 2 hours" -> 120). Use this instead of when for relative requests; the home computes the time.
         message:
           type: string
-          description: What to remind the user about, in their own words.
+          description: >-
+            Only the task to be reminded of — the bare action, with the "remind
+            me" framing, the recurrence, and the time all removed. For "remind me
+            every day at noon to drink a beer" pass "drink a beer"; for "remind me
+            tomorrow at 6pm to take out the trash" pass "take out the trash". Do
+            NOT include words like "remind me", "every day", "daily", "at noon",
+            "tomorrow", or "at 6pm" — those belong in when / in_minutes / rrule.
         rrule:
           type: string
           description: Optional recurrence rule. Use FREQ=DAILY for "every day"/"daily"; use FREQ=WEEKLY;BYDAY=MO for weekly reminders, replacing MO with TU/WE/TH/FR/SA/SU. Set when to the first occurrence. Omit for one-time reminders.
