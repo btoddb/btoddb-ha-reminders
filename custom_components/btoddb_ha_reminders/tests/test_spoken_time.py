@@ -140,9 +140,9 @@ def test_format_recurrence_is_case_insensitive():
 
 
 def test_format_recurrence_falls_back_for_unsupported_freq():
-    # FREQ=MONTHLY is rejected by delivery.validate_rrule today, but format_recurrence
+    # FREQ=YEARLY is rejected by delivery.validate_rrule, but format_recurrence
     # should still degrade gracefully rather than raise.
-    assert format_recurrence(_at(2026, 6, 22, 9), NOW, "FREQ=MONTHLY") == (
+    assert format_recurrence(_at(2026, 6, 22, 9), NOW, "FREQ=YEARLY") == (
         format_spoken_time(_at(2026, 6, 22, 9), NOW)
     )
 
@@ -187,3 +187,39 @@ def test_format_recurrence_weekly_interval_large_uses_numeric_ordinal():
     assert format_recurrence(
         _at(2026, 6, 22, 9), NOW, "FREQ=WEEKLY;BYDAY=MO;INTERVAL=11"
     ) == ("every 11th Monday at 9 AM")
+
+
+def test_format_recurrence_monthly_bare_uses_day_of_month():
+    assert format_recurrence(_at(2026, 6, 21, 9), NOW, "FREQ=MONTHLY") == (
+        "every month on the 21st at 9 AM"
+    )
+
+
+def test_format_recurrence_monthly_bymonthday():
+    assert format_recurrence(
+        _at(2026, 6, 15, 9), NOW, "FREQ=MONTHLY;BYMONTHDAY=15"
+    ) == ("every month on the 15th at 9 AM")
+
+
+def test_format_recurrence_monthly_last_day():
+    assert format_recurrence(
+        _at(2026, 6, 30, 9), NOW, "FREQ=MONTHLY;BYMONTHDAY=-1"
+    ) == ("every month on the last day at 9 AM")
+
+
+def test_format_recurrence_monthly_first_friday():
+    assert format_recurrence(_at(2026, 6, 5, 9), NOW, "FREQ=MONTHLY;BYDAY=1FR") == (
+        "every month on the first Friday at 9 AM"
+    )
+
+
+def test_format_recurrence_monthly_last_friday():
+    assert format_recurrence(_at(2026, 6, 26, 9), NOW, "FREQ=MONTHLY;BYDAY=-1FR") == (
+        "every month on the last Friday at 9 AM"
+    )
+
+
+def test_format_recurrence_monthly_interval_three_is_quarterly():
+    assert format_recurrence(
+        _at(2026, 6, 15, 9), NOW, "FREQ=MONTHLY;BYMONTHDAY=15;INTERVAL=3"
+    ) == ("every third month on the 15th at 9 AM")

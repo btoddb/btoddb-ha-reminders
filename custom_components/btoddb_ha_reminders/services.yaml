@@ -2,18 +2,30 @@ create:
   name: Create reminder
   description: >-
     Add a time-based reminder at an absolute time, a relative delay, or a recurring
-    daily/weekly schedule. Returns {success, message, start, confirmation} where
-    confirmation is a ready-to-say sentence the conversation agent can echo back
-    verbatim.
+    daily/weekly/monthly schedule. Returns {success, message, start, confirmation}
+    where confirmation is a ready-to-say sentence the conversation agent can echo
+    back verbatim.
 
     For recurring requests such as "every day at 2 PM", set when to the first
     desired occurrence and set rrule to "FREQ=DAILY". For weekly requests, set
     rrule to "FREQ=WEEKLY;BYDAY=MO" with the requested weekday.
 
-    For "every N weeks/days" cadences, add INTERVAL=N: "every week" -> omit
-    INTERVAL (or INTERVAL=1), "every other week" -> INTERVAL=2, "every third
-    week" -> INTERVAL=3, "every fourth week" -> INTERVAL=4, etc. Same mapping
-    applies to FREQ=DAILY ("every other day" -> INTERVAL=2, ...).
+    For monthly requests, set when to the first desired occurrence and rrule to
+    one of: "FREQ=MONTHLY;BYMONTHDAY=15" (a fixed day 1-28), "FREQ=MONTHLY;
+    BYMONTHDAY=-1" ("last day of the month" — covers 28/29/30/31 however many
+    days that month has), or "FREQ=MONTHLY;BYDAY=1FR" ("first Friday" — use
+    1/2/3/4 for first/second/third/fourth, or -1 for "last", followed by MO/TU/
+    WE/TH/FR/SA/SU). "when" must already land on the requested day (e.g. the
+    first Friday of its month for BYDAY=1FR, or the actual last day of its
+    month for BYMONTHDAY=-1) — the service rejects a mismatch. A fixed
+    BYMONTHDAY of 29, 30, or 31 is rejected (not every month has that day); use
+    BYMONTHDAY=-1 instead.
+
+    For "every N weeks/days/months" cadences, add INTERVAL=N: "every week" ->
+    omit INTERVAL (or INTERVAL=1), "every other week" -> INTERVAL=2, "every
+    third week" -> INTERVAL=3, "every fourth week" -> INTERVAL=4, etc. Same
+    mapping applies to FREQ=DAILY ("every other day" -> INTERVAL=2, ...) and
+    FREQ=MONTHLY ("quarterly"/"every 3 months" -> INTERVAL=3, ...).
   fields:
     message:
       name: Message
@@ -49,15 +61,21 @@ create:
       name: Recurrence rule
       description: >-
         iCalendar RRULE string for recurring reminders. Supported values:
-        "FREQ=DAILY" (fires every day at the same time) or
-        "FREQ=WEEKLY;BYDAY=MO" (fires every week on the same day — replace MO
-        with TU/WE/TH/FR/SA/SU for other weekdays). Add ";INTERVAL=N" to skip
-        weeks/days: INTERVAL=1 (or omitted) means every week/day, INTERVAL=2
-        means every other week/day, INTERVAL=3 means every third week/day,
-        and so on — map "every other week" to INTERVAL=2, "every third week"
-        to INTERVAL=3, "every fourth week" to INTERVAL=4, etc. Set "when" to
-        the first desired occurrence; after each delivery the next occurrence
-        is scheduled automatically.
+        "FREQ=DAILY" (fires every day at the same time), "FREQ=WEEKLY;BYDAY=MO"
+        (fires every week on the same day — replace MO with TU/WE/TH/FR/SA/SU
+        for other weekdays), "FREQ=MONTHLY;BYMONTHDAY=15" (fires on the same
+        day of the month, 1-28), "FREQ=MONTHLY;BYMONTHDAY=-1" (fires on the
+        last day of the month, whatever that day is), or "FREQ=MONTHLY;
+        BYDAY=1FR" (fires on an ordinal weekday — 1/2/3/4 for first/second/
+        third/fourth, or -1 for last, followed by MO/TU/WE/TH/FR/SA/SU). Add
+        ";INTERVAL=N" to skip weeks/days/months: INTERVAL=1 (or omitted) means
+        every week/day/month, INTERVAL=2 means every other, INTERVAL=3 means
+        every third, and so on — map "every other week" to INTERVAL=2, "every
+        third week" to INTERVAL=3, "every fourth week" to INTERVAL=4,
+        "quarterly" to "FREQ=MONTHLY;INTERVAL=3", etc. Set "when" to the first
+        desired occurrence — it must already land on the requested day (e.g.
+        the first Friday of its month for BYDAY=1FR); after each delivery the
+        next occurrence is scheduled automatically.
       required: false
       example: "FREQ=DAILY"
       selector:
@@ -108,10 +126,12 @@ update:
     rrule:
       name: Recurrence rule
       description: >-
-        New RRULE for this reminder ("FREQ=DAILY", "FREQ=WEEKLY;BYDAY=MO", etc.).
-        Add ";INTERVAL=N" for "every other"/"every Nth" week or day cadences
-        (INTERVAL=2 -> every other, INTERVAL=3 -> every third, etc.). Pass an
-        empty string or null to convert a recurring reminder back to a
+        New RRULE for this reminder ("FREQ=DAILY", "FREQ=WEEKLY;BYDAY=MO",
+        "FREQ=MONTHLY;BYMONTHDAY=15", "FREQ=MONTHLY;BYMONTHDAY=-1" for the
+        last day, "FREQ=MONTHLY;BYDAY=1FR" for an ordinal weekday, etc.). Add
+        ";INTERVAL=N" for "every other"/"every Nth" week, day, or month
+        cadences (INTERVAL=2 -> every other, INTERVAL=3 -> every third, etc.).
+        Pass an empty string or null to convert a recurring reminder back to a
         one-shot. Omit to leave the recurrence unchanged.
       required: false
       example: "FREQ=WEEKLY;BYDAY=MO"

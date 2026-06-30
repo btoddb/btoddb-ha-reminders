@@ -229,6 +229,10 @@ export class BtoddbRemindersCard extends LitElement {
     _freq: { state: true },
     _weekday: { state: true },
     _interval: { state: true },
+    _monthMode: { state: true },
+    _monthDay: { state: true },
+    _monthOrdinal: { state: true },
+    _monthWeekday: { state: true },
     _locMessage: { state: true },
     _locPerson: { state: true },
     _locZone: { state: true },
@@ -246,9 +250,13 @@ export class BtoddbRemindersCard extends LitElement {
   private _message = "";
   private _when = defaultWhen();
   private _repeatOpen = false;
-  private _freq: "daily" | "weekly" = "daily";
+  private _freq: "daily" | "weekly" | "monthly" = "daily";
   private _weekday = "MO";
   private _interval = 1;
+  private _monthMode: "day" | "weekday" = "day";
+  private _monthDay = 1;
+  private _monthOrdinal = "1";
+  private _monthWeekday = "MO";
   private _locMessage = "";
   private _locPerson = "";
   private _locZone = "";
@@ -362,7 +370,47 @@ export class BtoddbRemindersCard extends LitElement {
     if (!this._repeatOpen) return "";
     const suffix = this._interval > 1 ? `;INTERVAL=${this._interval}` : "";
     if (this._freq === "daily") return `FREQ=DAILY${suffix}`;
-    return `FREQ=WEEKLY;BYDAY=${this._weekday}${suffix}`;
+    if (this._freq === "weekly") return `FREQ=WEEKLY;BYDAY=${this._weekday}${suffix}`;
+    // monthly
+    if (this._monthMode === "weekday") {
+      return `FREQ=MONTHLY;BYDAY=${this._monthOrdinal}${this._monthWeekday}${suffix}`;
+    }
+    const bmd = this._monthDay === -1 ? "-1" : String(this._monthDay);
+    return `FREQ=MONTHLY;BYMONTHDAY=${bmd}${suffix}`;
+  }
+
+  /** Set `when` to the nth ordinal weekday within its month. */
+  private _adjustToMonthWeekday(when: string, ordinal: string, weekday: string): string {
+    const d = new Date(when);
+    const targetDow = BYDAY_JS_DAY[weekday] ?? 1;
+    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    let day = 1;
+    if (ordinal === "-1") {
+      for (let i = lastDay; i >= 1; i--) {
+        if (new Date(d.getFullYear(), d.getMonth(), i).getDay() === targetDow) {
+          day = i;
+          break;
+        }
+      }
+    } else {
+      const n = parseInt(ordinal, 10);
+      let count = 0;
+      for (let i = 1; i <= lastDay; i++) {
+        if (new Date(d.getFullYear(), d.getMonth(), i).getDay() === targetDow) {
+          if (++count === n) { day = i; break; }
+        }
+      }
+    }
+    d.setDate(day);
+    return toLocalInput(d);
+  }
+
+  /** Set `when` to the given day-of-month (-1 = last day), clamped to month length. */
+  private _adjustToMonthDay(when: string, day: number): string {
+    const d = new Date(when);
+    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    d.setDate(day === -1 ? lastDay : Math.min(day, lastDay));
+    return toLocalInput(d);
   }
 
   /**
@@ -398,11 +446,17 @@ export class BtoddbRemindersCard extends LitElement {
     }
     const editingUid = this._editingUid;
     const rrule = this._buildRrule();
-    // For weekly recurrence, shift the anchor date to the chosen weekday so the
-    // backend's BYDAY-vs-start validation always passes.
+    // Shift the anchor date to match the recurrence rule so the backend's
+    // BYDAY-vs-start / BYMONTHDAY-vs-start validation always passes.
     let when = this._when;
     if (rrule && this._freq === "weekly") {
       when = this._adjustToWeekday(when, this._weekday);
+    } else if (rrule && this._freq === "monthly") {
+      if (this._monthMode === "weekday") {
+        when = this._adjustToMonthWeekday(when, this._monthOrdinal, this._monthWeekday);
+      } else {
+        when = this._adjustToMonthDay(when, this._monthDay);
+      }
     }
     const serviceData: Record<string, unknown> = { message, when };
     if (rrule) serviceData.rrule = rrule;
@@ -439,6 +493,10 @@ export class BtoddbRemindersCard extends LitElement {
       this._freq = "daily";
       this._weekday = "MO";
       this._interval = 1;
+      this._monthMode = "day";
+      this._monthDay = 1;
+      this._monthOrdinal = "1";
+      this._monthWeekday = "MO";
       await this._fetch();
       this._notifyTimeRemindersChanged();
     } catch (err) {
@@ -526,15 +584,43 @@ export class BtoddbRemindersCard extends LitElement {
         this._freq = "weekly";
         const match = upper.match(/BYDAY=(\w+)/);
         this._weekday = match ? match[1] : "MO";
+        this._monthMode = "day";
+        this._monthDay = 1;
+        this._monthOrdinal = "1";
+        this._monthWeekday = "MO";
+      } else if (upper.includes("FREQ=MONTHLY")) {
+        this._freq = "monthly";
+        const bydayMatch = upper.match(/BYDAY=(-?[1-4])(MO|TU|WE|TH|FR|SA|SU)/);
+        if (bydayMatch) {
+          this._monthMode = "weekday";
+          this._monthOrdinal = bydayMatch[1];
+          this._monthWeekday = bydayMatch[2];
+          this._monthDay = 1;
+        } else {
+          this._monthMode = "day";
+          const bymdMatch = upper.match(/BYMONTHDAY=(-?\d+)/);
+          this._monthDay = bymdMatch ? parseInt(bymdMatch[1], 10) : item.start.getDate();
+          this._monthOrdinal = "1";
+          this._monthWeekday = "MO";
+        }
+        this._weekday = "MO";
       } else {
         this._freq = "daily";
         this._weekday = "MO";
+        this._monthMode = "day";
+        this._monthDay = 1;
+        this._monthOrdinal = "1";
+        this._monthWeekday = "MO";
       }
     } else {
       this._repeatOpen = false;
       this._freq = "daily";
       this._weekday = "MO";
       this._interval = 1;
+      this._monthMode = "day";
+      this._monthDay = 1;
+      this._monthOrdinal = "1";
+      this._monthWeekday = "MO";
     }
     this._error = "";
   }
@@ -558,6 +644,10 @@ export class BtoddbRemindersCard extends LitElement {
     this._freq = "daily";
     this._weekday = "MO";
     this._interval = 1;
+    this._monthMode = "day";
+    this._monthDay = 1;
+    this._monthOrdinal = "1";
+    this._monthWeekday = "MO";
     this._locMessage = "";
     this._locPerson = "";
     this._locZone = "";
@@ -703,6 +793,27 @@ export class BtoddbRemindersCard extends LitElement {
       }
       return `${prefix === "Every" ? "Weekly" : `${prefix} week`} at ${time}`;
     }
+    if (upper.includes("FREQ=MONTHLY")) {
+      const bydayMatch = upper.match(/BYDAY=(-1|[1-4])(MO|TU|WE|TH|FR|SA|SU)/);
+      if (bydayMatch) {
+        const ordWords: Record<string, string> = {
+          "1": "first", "2": "second", "3": "third", "4": "fourth", "-1": "last",
+        };
+        const ordWord = ordWords[bydayMatch[1]] ?? bydayMatch[1];
+        const dayName = BYDAY_FULL[bydayMatch[2]] ?? bydayMatch[2];
+        return `${prefix} month on the ${ordWord} ${dayName} at ${time}`;
+      }
+      const bymdMatch = upper.match(/BYMONTHDAY=(-?\d+)/);
+      if (bymdMatch && bymdMatch[1] === "-1") {
+        return `${prefix} month on the last day at ${time}`;
+      }
+      const day = bymdMatch ? parseInt(bymdMatch[1], 10) : start.getDate();
+      const daySuffix =
+        day % 100 >= 11 && day % 100 <= 13
+          ? "th"
+          : ({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[day % 10] ?? "th";
+      return `${prefix} month on the ${day}${daySuffix} at ${time}`;
+    }
     return rrule;
   }
 
@@ -738,11 +849,12 @@ export class BtoddbRemindersCard extends LitElement {
                   .value=${this._freq}
                   @change=${(e: Event) => {
                     this._freq = (e.target as HTMLSelectElement)
-                      .value as "daily" | "weekly";
+                      .value as "daily" | "weekly" | "monthly";
                   }}
                 >
                   <option value="daily">Daily</option>
                   <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
                 </select>
                 <span class="interval-label">every</span>
                 <input
@@ -756,7 +868,11 @@ export class BtoddbRemindersCard extends LitElement {
                   }}
                 />
                 <span class="interval-label"
-                  >${this._freq === "daily" ? "day(s)" : "week(s)"}</span
+                  >${this._freq === "daily"
+                    ? "day(s)"
+                    : this._freq === "weekly"
+                      ? "week(s)"
+                      : "month(s)"}</span
                 >
                 ${this._freq === "weekly"
                   ? html`
@@ -777,6 +893,83 @@ export class BtoddbRemindersCard extends LitElement {
                             </button>
                           `,
                         )}
+                      </div>
+                    `
+                  : nothing}
+                ${this._freq === "monthly"
+                  ? html`
+                      <div class="month-opts">
+                        <select
+                          class="month-mode-select"
+                          .value=${this._monthMode}
+                          @change=${(e: Event) => {
+                            this._monthMode = (e.target as HTMLSelectElement)
+                              .value as "day" | "weekday";
+                          }}
+                        >
+                          <option value="day">Day of month</option>
+                          <option value="weekday">Day of week</option>
+                        </select>
+                        ${this._monthMode === "day"
+                          ? html`
+                              <select
+                                class="month-day-select"
+                                .value=${String(this._monthDay)}
+                                @change=${(e: Event) => {
+                                  this._monthDay = parseInt(
+                                    (e.target as HTMLSelectElement).value,
+                                    10,
+                                  );
+                                }}
+                              >
+                                ${Array.from({ length: 28 }, (_, i) => i + 1).map(
+                                  (n) => html`<option
+                                    value=${n}
+                                    ?selected=${this._monthDay === n}
+                                  >
+                                    ${n}
+                                  </option>`,
+                                )}
+                                <option value="-1" ?selected=${this._monthDay === -1}>
+                                  Last day
+                                </option>
+                              </select>
+                            `
+                          : html`
+                              <select
+                                class="month-ordinal-select"
+                                .value=${this._monthOrdinal}
+                                @change=${(e: Event) => {
+                                  this._monthOrdinal = (
+                                    e.target as HTMLSelectElement
+                                  ).value;
+                                }}
+                              >
+                                <option value="1">First</option>
+                                <option value="2">Second</option>
+                                <option value="3">Third</option>
+                                <option value="4">Fourth</option>
+                                <option value="-1">Last</option>
+                              </select>
+                              <div class="weekday-chips">
+                                ${WEEKDAY_CHIPS.map(
+                                  ({ code, label }) => html`
+                                    <button
+                                      type="button"
+                                      class="chip ${this._monthWeekday === code
+                                        ? "selected"
+                                        : ""}"
+                                      title=${BYDAY_FULL[code] ?? code}
+                                      @click=${() => {
+                                        this._monthWeekday = code;
+                                      }}
+                                    >
+                                      ${label}
+                                    </button>
+                                  `,
+                                )}
+                              </div>
+                            `}
                       </div>
                     `
                   : nothing}
@@ -1392,6 +1585,26 @@ export class BtoddbRemindersCard extends LitElement {
     .chip:hover:not(.selected) {
       border-color: var(--primary-color, #03a9f4);
       color: var(--primary-color, #03a9f4);
+    }
+    .month-opts {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-top: 6px;
+    }
+    .month-mode-select,
+    .month-day-select,
+    .month-ordinal-select {
+      height: 36px;
+      padding: 0 8px;
+      border: 1px solid var(--divider-color, #e0e0e0);
+      border-radius: 4px;
+      background: var(--card-background-color, #fff);
+      color: var(--primary-text-color, #212121);
+      color-scheme: light dark;
+      font-family: inherit;
+      font-size: 14px;
     }
   `;
 }

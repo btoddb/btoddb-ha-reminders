@@ -9,6 +9,7 @@ reading an ISO/digit-clock form aloud. Ported from the Jinja in the original
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -28,6 +29,17 @@ _BYDAY_TO_NAME: dict[str, str] = {
     "FR": "Friday",
     "SA": "Saturday",
     "SU": "Sunday",
+}
+
+# Mirrors ``delivery._MONTHLY_BYDAY_RE``; kept local so this module stays
+# HA/engine-import-free.
+_MONTHLY_BYDAY_RE = re.compile(r"^(-1|[1-4])(MO|TU|WE|TH|FR|SA|SU)$")
+_MONTHLY_BYDAY_ORDINAL_WORDS: dict[str, str] = {
+    "1": "first",
+    "2": "second",
+    "3": "third",
+    "4": "fourth",
+    "-1": "last",
 }
 
 
@@ -105,12 +117,43 @@ def _interval_prefix(interval: int) -> str:
     return f"every {_ordinal(interval)}"
 
 
+def _day_ordinal(n: int) -> str:
+    """Numeric day-of-month ordinal, e.g. 1 -> "1st", 15 -> "15th", 22 -> "22nd"."""
+    if _ORDINAL_TEENS_LOW <= n % 100 <= _ORDINAL_TEENS_HIGH:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
+
+
+def _format_monthly_recurrence(
+    parts: dict[str, str], start: datetime, prefix: str
+) -> str:
+    """Render the ``FREQ=MONTHLY`` cadence, e.g. "every month on the first Friday"."""
+    clock = _format_clock(start)
+    byday = parts.get("BYDAY")
+    if byday:
+        match = _MONTHLY_BYDAY_RE.match(byday)
+        if match:
+            ordinal_word = _MONTHLY_BYDAY_ORDINAL_WORDS.get(
+                match.group(1), match.group(1)
+            )
+            weekday = _BYDAY_TO_NAME.get(match.group(2), match.group(2))
+            return f"{prefix} month on the {ordinal_word} {weekday} at {clock}"
+    bymonthday = parts.get("BYMONTHDAY")
+    if bymonthday == "-1":
+        return f"{prefix} month on the last day at {clock}"
+    day = int(bymonthday) if bymonthday else start.day
+    return f"{prefix} month on the {_day_ordinal(day)} at {clock}"
+
+
 def format_recurrence(start: datetime, now: datetime, rrule: str) -> str:
     """
     Render a recurring reminder's cadence ("every day at 2 PM", "every other week...").
 
-    Covers the rrule shapes the engine actually accepts (``FREQ=DAILY`` and
-    ``FREQ=WEEKLY`` with optional ``BYDAY``, both with optional ``INTERVAL`` — see
+    Covers the rrule shapes the engine actually accepts (``FREQ=DAILY``,
+    ``FREQ=WEEKLY`` with optional ``BYDAY``, and ``FREQ=MONTHLY`` with optional
+    ``BYMONTHDAY``/``BYDAY``, all with optional ``INTERVAL`` — see
     ``delivery.validate_rrule``); anything else falls back to the one-shot spoken
     time for ``start``.
     """
@@ -133,6 +176,8 @@ def format_recurrence(start: datetime, now: datetime, rrule: str) -> str:
         if weekday is None:
             weekday = start.strftime("%A")
         return f"{prefix} {weekday} at {clock}"
+    if freq == "MONTHLY":
+        return _format_monthly_recurrence(parts, start, prefix)
 
     return format_spoken_time(start, now)
 
