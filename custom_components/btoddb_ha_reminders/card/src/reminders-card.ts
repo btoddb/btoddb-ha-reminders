@@ -943,12 +943,12 @@ export class BtoddbRemindersCard extends LitElement {
     `;
   }
 
-  /** Bold, labeled divider that splits the time reminders from the location reminders. */
-  private _renderSectionDivider() {
+  /** Bold, labeled heading for reminder groups. */
+  private _renderSectionHeading(label: string, icon: string) {
     return html`
-      <div class="section-divider">
-        <ha-icon icon="mdi:map-marker"></ha-icon>
-        <span>Location</span>
+      <div class="section-heading">
+        <ha-icon icon=${icon}></ha-icon>
+        <span>${label}</span>
       </div>
     `;
   }
@@ -1031,9 +1031,12 @@ export class BtoddbRemindersCard extends LitElement {
         ? html`<div class="empty">No reminders.</div>`
         : html`
                 <div class="list">
+                  ${this._items.length
+          ? this._renderSectionHeading("Time", "mdi:alarm")
+          : nothing}
                   ${this._renderTimeRows()}
-                  ${locItems.length && this._items.length
-          ? this._renderSectionDivider()
+                  ${locItems.length
+          ? this._renderSectionHeading("Location", "mdi:map-marker")
           : nothing}
                   ${[...locUndelivered, ...locDelivered].map((item, i) =>
           this._renderLocationItem(item, this._items.length > 0 && i === 0),
@@ -1175,10 +1178,8 @@ export class BtoddbRemindersCard extends LitElement {
       margin-top: 4px;
       border-top: 1px solid var(--divider-color, #e0e0e0);
     }
-    .list > .day-header:first-child {
+    .section-heading + .day-header {
       border-top: none;
-      margin-top: 0;
-      padding-top: 4px;
     }
     .item.day-first {
       border-top: none;
@@ -1186,10 +1187,8 @@ export class BtoddbRemindersCard extends LitElement {
     .item.section-first {
       border-top: none;
     }
-    /* Filled, tinted banner between the time and location reminder groups —
-       reads far more clearly than a hairline or double rule, especially on
-       a phone screen. */
-    .section-divider {
+    /* Filled, tinted banner for reminder groups. */
+    .section-heading {
       display: flex;
       align-items: center;
       gap: 8px;
@@ -1204,7 +1203,10 @@ export class BtoddbRemindersCard extends LitElement {
       letter-spacing: 0.07em;
       text-transform: uppercase;
     }
-    .section-divider ha-icon {
+    .list > .section-heading:first-child {
+      margin-top: 0;
+    }
+    .section-heading ha-icon {
       --mdc-icon-size: 18px;
       width: 18px;
       height: 18px;
