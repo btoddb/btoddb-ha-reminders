@@ -20,6 +20,7 @@ from homeassistant.components.calendar import (
 from homeassistant.util import dt as dt_util
 
 from .const import CONF_CALENDAR_NAME, DATA_STORE, DEFAULT_CALENDAR_NAME, DOMAIN
+from .delivery import rrule_step as _rrule_step
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -41,19 +42,6 @@ async def async_setup_entry(
     """Set up the reminders calendar entity from a config entry."""
     store: ReminderStore = hass.data[DOMAIN][entry.entry_id][DATA_STORE]
     async_add_entities([ReminderCalendarEntity(store, entry)])
-
-
-def _rrule_step(rrule: str) -> timedelta | None:
-    """Return the recurrence step for a supported RRULE string, or None."""
-    for token in rrule.upper().split(";"):
-        if token.startswith("FREQ="):
-            freq = token[5:]
-            if freq == "DAILY":
-                return timedelta(days=1)
-            if freq == "WEEKLY":
-                return timedelta(weeks=1)
-            return None
-    return None
 
 
 def _expand_recurring(

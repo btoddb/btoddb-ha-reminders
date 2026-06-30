@@ -100,6 +100,26 @@ def _interval(parts: dict[str, str]) -> int:
     return int(raw) if raw is not None else 1
 
 
+def rrule_step(rrule: str) -> timedelta | None:
+    """
+    Return the recurrence step for a supported RRULE string, or ``None``.
+
+    Parses ``FREQ`` and ``INTERVAL`` (default 1). Used by both the delivery
+    path and the calendar expansion path so they stay in sync.
+    """
+    parts = _parse_rrule_parts(rrule.upper())
+    freq = parts.get("FREQ")
+    try:
+        interval = _interval(parts)
+    except ValueError:
+        return None
+    if freq == "DAILY":
+        return timedelta(days=interval)
+    if freq == "WEEKLY":
+        return timedelta(weeks=interval)
+    return None
+
+
 def advance_recurring(event: ReminderEvent, now: datetime) -> ReminderEvent | None:
     """
     Return the next occurrence of a recurring reminder strictly after ``now``.

@@ -13,6 +13,7 @@ due_events = delivery.due_events
 effective_watermark = delivery.effective_watermark
 resolve_notify_target = delivery.resolve_notify_target
 advance_recurring = delivery.advance_recurring
+rrule_step = delivery.rrule_step
 validate_rrule = delivery.validate_rrule
 snoozed_event = delivery.snoozed_event
 build_snooze_notify_data = delivery.build_snooze_notify_data
@@ -464,3 +465,48 @@ def test_parse_snooze_action_non_integer_minutes_returns_none():
 
 def test_parse_snooze_action_empty_minutes_returns_none():
     assert parse_snooze_action(f"{SNOOZE_ACTION_PREFIX}__uid123__") is None
+
+
+# ---------------------------------------------------------------------------
+# rrule_step() — shared step helper used by delivery and calendar expansion.
+# ---------------------------------------------------------------------------
+
+
+def test_rrule_step_daily_no_interval_returns_one_day():
+    assert rrule_step("FREQ=DAILY") == timedelta(days=1)
+
+
+def test_rrule_step_weekly_no_interval_returns_one_week():
+    assert rrule_step("FREQ=WEEKLY") == timedelta(weeks=1)
+
+
+def test_rrule_step_weekly_byday_no_interval_returns_one_week():
+    assert rrule_step("FREQ=WEEKLY;BYDAY=MO") == timedelta(weeks=1)
+
+
+def test_rrule_step_daily_interval_three_returns_three_days():
+    assert rrule_step("FREQ=DAILY;INTERVAL=3") == timedelta(days=3)
+
+
+def test_rrule_step_weekly_interval_two_returns_two_weeks():
+    assert rrule_step("FREQ=WEEKLY;BYDAY=MO;INTERVAL=2") == timedelta(weeks=2)
+
+
+def test_rrule_step_weekly_interval_one_same_as_no_interval():
+    assert rrule_step("FREQ=WEEKLY;INTERVAL=1") == rrule_step("FREQ=WEEKLY")
+
+
+def test_rrule_step_case_insensitive():
+    assert rrule_step("freq=daily;interval=4") == timedelta(days=4)
+
+
+def test_rrule_step_unsupported_freq_returns_none():
+    assert rrule_step("FREQ=MONTHLY") is None
+
+
+def test_rrule_step_no_freq_returns_none():
+    assert rrule_step("BYDAY=MO") is None
+
+
+def test_rrule_step_invalid_interval_returns_none():
+    assert rrule_step("FREQ=DAILY;INTERVAL=abc") is None
