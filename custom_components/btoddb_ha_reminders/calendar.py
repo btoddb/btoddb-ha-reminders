@@ -20,7 +20,7 @@ from homeassistant.components.calendar import (
 from homeassistant.util import dt as dt_util
 
 from .const import CONF_CALENDAR_NAME, DATA_STORE, DEFAULT_CALENDAR_NAME, DOMAIN
-from .delivery import rrule_step as _rrule_step
+from .delivery import next_occurrence as _next_occurrence
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -50,19 +50,22 @@ def _expand_recurring(
     """Return CalendarEvents for every occurrence of a recurring event in the range."""
     if event.rrule is None:
         return []
-    step = _rrule_step(event.rrule)
-    if step is None:
-        return []
     # Start from the stored anchor (always the next future occurrence — roll-forward
     # model). Never walk backward: occurrences before event.start have already fired.
     anchor = event.start
     while anchor < range_start:
-        anchor += step
+        nxt = _next_occurrence(event.rrule, anchor)
+        if nxt is None:
+            return []
+        anchor = nxt
     results: list[CalendarEvent] = []
     current = anchor
     while current <= range_end:
         results.append(_to_calendar_event(dataclasses.replace(event, start=current)))
-        current += step
+        nxt = _next_occurrence(event.rrule, current)
+        if nxt is None:
+            break
+        current = nxt
     return results
 
 

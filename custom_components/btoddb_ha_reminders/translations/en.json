@@ -36,7 +36,7 @@
   "services": {
     "create": {
       "name": "Create reminder",
-      "description": "Add a time-based reminder at an absolute time or a relative delay.",
+      "description": "Add a time-based reminder at an absolute time, a relative delay, or a recurring daily/weekly/monthly schedule.",
       "fields": {
         "message": {
           "name": "Message",
@@ -52,7 +52,7 @@
         },
         "rrule": {
           "name": "Recurrence rule",
-          "description": "RRULE string for recurring reminders (FREQ=DAILY or FREQ=WEEKLY;BYDAY=MO). After each delivery the next occurrence is scheduled automatically."
+          "description": "RRULE string for recurring reminders (FREQ=DAILY, FREQ=WEEKLY;BYDAY=MO, FREQ=MONTHLY;BYMONTHDAY=15, FREQ=MONTHLY;BYMONTHDAY=-1 for the last day, or FREQ=MONTHLY;BYDAY=1FR for an ordinal weekday). After each delivery the next occurrence is scheduled automatically."
         }
       }
     },
@@ -78,7 +78,7 @@
         },
         "rrule": {
           "name": "Recurrence rule",
-          "description": "New RRULE (FREQ=DAILY, FREQ=WEEKLY;BYDAY=MO, etc.). Pass empty or null to clear. Omit to leave unchanged."
+          "description": "New RRULE (FREQ=DAILY, FREQ=WEEKLY;BYDAY=MO, FREQ=MONTHLY;BYMONTHDAY=15, etc.). Pass empty or null to clear. Omit to leave unchanged."
         }
       }
     },

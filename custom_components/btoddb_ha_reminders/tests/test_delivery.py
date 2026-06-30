@@ -13,6 +13,7 @@ due_events = delivery.due_events
 effective_watermark = delivery.effective_watermark
 resolve_notify_target = delivery.resolve_notify_target
 advance_recurring = delivery.advance_recurring
+next_occurrence = delivery.next_occurrence
 rrule_step = delivery.rrule_step
 validate_rrule = delivery.validate_rrule
 snoozed_event = delivery.snoozed_event
@@ -132,7 +133,7 @@ def test_advance_recurring_weekly_all_byday_values():
 
 
 def test_advance_recurring_unknown_rrule_returns_none():
-    event = _recurring_ev("FREQ=MONTHLY")
+    event = _recurring_ev("FREQ=YEARLY")
     assert advance_recurring(event, NOW) is None
 
 
@@ -171,6 +172,159 @@ def test_advance_recurring_weekly_self_heals_after_multi_week_outage():
 
 
 # ---------------------------------------------------------------------------
+# next_occurrence() / advance_recurring() — FREQ=MONTHLY.
+#
+# Reference dates (all 2026 unless noted): June 1 is a Monday, so June Fridays
+# are 5, 12, 19, 26 (first=5, last=26); June has 30 days. July 1 is a
+# Wednesday, so July Fridays are 3, 10, 17, 24, 31 (first=3, last=31); July
+# has 31 days. 2026 is not a leap year (Feb has 28 days); 2028 is.
+# ---------------------------------------------------------------------------
+
+
+def test_next_occurrence_monthly_bymonthday_adds_one_month():
+    current = datetime(2026, 6, 15, 9, 0, tzinfo=TZ)
+    assert next_occurrence("FREQ=MONTHLY;BYMONTHDAY=15", current) == datetime(
+        2026, 7, 15, 9, 0, tzinfo=TZ
+    )
+
+
+def test_next_occurrence_monthly_bare_implies_bymonthday_from_anchor():
+    current = datetime(2026, 6, 21, 9, 0, tzinfo=TZ)
+    assert next_occurrence("FREQ=MONTHLY", current) == datetime(
+        2026, 7, 21, 9, 0, tzinfo=TZ
+    )
+
+
+def test_next_occurrence_monthly_last_day_resolves_per_month_length():
+    # June 30 (last day of June) -> July 31 (last day of July).
+    current = datetime(2026, 6, 30, 9, 0, tzinfo=TZ)
+    assert next_occurrence("FREQ=MONTHLY;BYMONTHDAY=-1", current) == datetime(
+        2026, 7, 31, 9, 0, tzinfo=TZ
+    )
+
+
+def test_next_occurrence_monthly_first_friday():
+    current = datetime(2026, 6, 5, 9, 0, tzinfo=TZ)  # first Friday of June
+    assert next_occurrence("FREQ=MONTHLY;BYDAY=1FR", current) == datetime(
+        2026, 7, 3, 9, 0, tzinfo=TZ
+    )  # first Friday of July
+
+
+def test_next_occurrence_monthly_last_friday():
+    current = datetime(2026, 6, 26, 9, 0, tzinfo=TZ)  # last Friday of June
+    assert next_occurrence("FREQ=MONTHLY;BYDAY=-1FR", current) == datetime(
+        2026, 7, 31, 9, 0, tzinfo=TZ
+    )  # last Friday of July
+
+
+def test_next_occurrence_monthly_year_rollover():
+    current = datetime(2026, 12, 15, 9, 0, tzinfo=TZ)
+    assert next_occurrence("FREQ=MONTHLY;BYMONTHDAY=15", current) == datetime(
+        2027, 1, 15, 9, 0, tzinfo=TZ
+    )
+
+
+def test_next_occurrence_monthly_last_day_leap_year_february():
+    current = datetime(2028, 1, 31, 9, 0, tzinfo=TZ)
+    assert next_occurrence("FREQ=MONTHLY;BYMONTHDAY=-1", current) == datetime(
+        2028, 2, 29, 9, 0, tzinfo=TZ
+    )
+
+
+def test_next_occurrence_monthly_interval_three_is_quarterly():
+    current = datetime(2026, 1, 15, 9, 0, tzinfo=TZ)
+    assert next_occurrence(
+        "FREQ=MONTHLY;BYMONTHDAY=15;INTERVAL=3", current
+    ) == datetime(2026, 4, 15, 9, 0, tzinfo=TZ)
+
+
+def test_next_occurrence_unsupported_freq_returns_none():
+    assert next_occurrence("FREQ=YEARLY", NOW) is None
+
+
+def test_next_occurrence_monthly_invalid_interval_returns_none():
+    assert next_occurrence("FREQ=MONTHLY;INTERVAL=abc", NOW) is None
+
+
+def test_advance_recurring_monthly_bymonthday_basic():
+    event = ReminderEvent(
+        uid="m1",
+        summary="pay rent",
+        start=datetime(2026, 6, 15, 9, 0, tzinfo=TZ),
+        rrule="FREQ=MONTHLY;BYMONTHDAY=15",
+    )
+    nxt = advance_recurring(event, NOW)  # NOW = 2026-06-21
+    assert nxt is not None
+    assert nxt.start == datetime(2026, 7, 15, 9, 0, tzinfo=TZ)
+    assert nxt.uid == event.uid
+    assert nxt.rrule == event.rrule
+
+
+def test_advance_recurring_monthly_last_day_across_month_length_change():
+    event = ReminderEvent(
+        uid="m2",
+        summary="close the books",
+        start=datetime(2026, 1, 31, 9, 0, tzinfo=TZ),
+        rrule="FREQ=MONTHLY;BYMONTHDAY=-1",
+    )
+    nxt = advance_recurring(event, datetime(2026, 1, 31, 10, 0, tzinfo=TZ))
+    assert nxt is not None
+    assert nxt.start == datetime(2026, 2, 28, 9, 0, tzinfo=TZ)
+
+
+def test_advance_recurring_monthly_first_friday():
+    event = ReminderEvent(
+        uid="m3",
+        summary="team standup",
+        start=datetime(2026, 6, 5, 9, 0, tzinfo=TZ),
+        rrule="FREQ=MONTHLY;BYDAY=1FR",
+    )
+    nxt = advance_recurring(event, NOW)  # NOW = 2026-06-21
+    assert nxt is not None
+    assert nxt.start == datetime(2026, 7, 3, 9, 0, tzinfo=TZ)
+
+
+def test_advance_recurring_monthly_self_heals_after_multi_month_outage():
+    event = ReminderEvent(
+        uid="m4",
+        summary="medicine",
+        start=datetime(2026, 1, 15, 9, 0, tzinfo=TZ),
+        rrule="FREQ=MONTHLY;BYMONTHDAY=15",
+    )
+    nxt = advance_recurring(event, NOW)  # NOW = 2026-06-21, 5 months later
+    assert nxt is not None
+    assert nxt.start > NOW
+    assert nxt.start == datetime(2026, 7, 15, 9, 0, tzinfo=TZ)
+
+
+def test_advance_recurring_monthly_quarterly_self_heals_in_phase():
+    event = ReminderEvent(
+        uid="m5",
+        summary="quarterly review",
+        start=datetime(2026, 1, 15, 9, 0, tzinfo=TZ),
+        rrule="FREQ=MONTHLY;BYMONTHDAY=15;INTERVAL=3",
+    )
+    nxt = advance_recurring(event, NOW)  # NOW = 2026-06-21
+    assert nxt is not None
+    assert nxt.start > NOW
+    assert nxt.start == datetime(2026, 7, 15, 9, 0, tzinfo=TZ)
+    months_elapsed = (nxt.start.year - event.start.year) * 12 + (
+        nxt.start.month - event.start.month
+    )
+    assert months_elapsed % 3 == 0
+
+
+def test_advance_recurring_monthly_unsupported_byday_returns_none():
+    event = ReminderEvent(
+        uid="m6",
+        summary="bad rrule",
+        start=NOW,
+        rrule="FREQ=MONTHLY;BYDAY=5FR",
+    )
+    assert advance_recurring(event, NOW) is None
+
+
+# ---------------------------------------------------------------------------
 # validate_rrule() — creation-time guard for unsupported/malformed rrules.
 # ---------------------------------------------------------------------------
 
@@ -203,9 +357,126 @@ def test_validate_rrule_weekly_byday_mismatch_returns_error():
 
 
 def test_validate_rrule_unsupported_freq_returns_error():
-    err = validate_rrule("FREQ=MONTHLY", NOW)
+    err = validate_rrule("FREQ=YEARLY", NOW)
     assert err is not None
     assert "Unsupported" in err
+
+
+# ---------------------------------------------------------------------------
+# validate_rrule() — FREQ=MONTHLY.
+# NOW = 2026-06-21 (day 21); June 5/26 are the first/last Fridays of June 2026.
+# ---------------------------------------------------------------------------
+
+
+def test_validate_rrule_monthly_bare_ok():
+    assert validate_rrule("FREQ=MONTHLY", NOW) is None
+
+
+def test_validate_rrule_monthly_bare_day_29_31_rejected():
+    err = validate_rrule("FREQ=MONTHLY", datetime(2026, 1, 29, tzinfo=UTC))
+    assert err is not None
+    assert "-1" in err
+
+
+def test_validate_rrule_monthly_bymonthday_match_ok():
+    assert validate_rrule("FREQ=MONTHLY;BYMONTHDAY=21", NOW) is None
+
+
+def test_validate_rrule_monthly_bymonthday_mismatch_returns_error():
+    err = validate_rrule("FREQ=MONTHLY;BYMONTHDAY=15", NOW)
+    assert err is not None
+    assert "15" in err
+    assert "21" in err
+
+
+def test_validate_rrule_monthly_bymonthday_29_rejected():
+    err = validate_rrule("FREQ=MONTHLY;BYMONTHDAY=29", NOW)
+    assert err is not None
+    assert "-1" in err
+
+
+def test_validate_rrule_monthly_bymonthday_30_rejected():
+    err = validate_rrule("FREQ=MONTHLY;BYMONTHDAY=30", NOW)
+    assert err is not None
+    assert "-1" in err
+
+
+def test_validate_rrule_monthly_bymonthday_31_rejected():
+    err = validate_rrule("FREQ=MONTHLY;BYMONTHDAY=31", NOW)
+    assert err is not None
+    assert "-1" in err
+
+
+def test_validate_rrule_monthly_bymonthday_zero_rejected():
+    err = validate_rrule("FREQ=MONTHLY;BYMONTHDAY=0", NOW)
+    assert err is not None
+
+
+def test_validate_rrule_monthly_bymonthday_non_numeric_rejected():
+    err = validate_rrule("FREQ=MONTHLY;BYMONTHDAY=abc", NOW)
+    assert err is not None
+    assert "BYMONTHDAY" in err
+
+
+def test_validate_rrule_monthly_bymonthday_last_day_match_ok():
+    # June 30, 2026 is the last day of June.
+    assert (
+        validate_rrule("FREQ=MONTHLY;BYMONTHDAY=-1", datetime(2026, 6, 30, tzinfo=UTC))
+        is None
+    )
+
+
+def test_validate_rrule_monthly_bymonthday_last_day_mismatch_returns_error():
+    err = validate_rrule("FREQ=MONTHLY;BYMONTHDAY=-1", NOW)
+    assert err is not None
+    assert "30" in err
+
+
+def test_validate_rrule_monthly_first_friday_match_ok():
+    assert (
+        validate_rrule("FREQ=MONTHLY;BYDAY=1FR", datetime(2026, 6, 5, tzinfo=UTC))
+        is None
+    )
+
+
+def test_validate_rrule_monthly_last_friday_match_ok():
+    assert (
+        validate_rrule("FREQ=MONTHLY;BYDAY=-1FR", datetime(2026, 6, 26, tzinfo=UTC))
+        is None
+    )
+
+
+def test_validate_rrule_monthly_byday_mismatch_returns_error():
+    # NOW (June 21) is a Sunday, not the first Friday of the month.
+    err = validate_rrule("FREQ=MONTHLY;BYDAY=1FR", NOW)
+    assert err is not None
+    assert "1FR" in err
+
+
+def test_validate_rrule_monthly_byday_5th_ordinal_rejected():
+    err = validate_rrule("FREQ=MONTHLY;BYDAY=5FR", NOW)
+    assert err is not None
+
+
+def test_validate_rrule_monthly_byday_unknown_weekday_rejected():
+    err = validate_rrule("FREQ=MONTHLY;BYDAY=1XX", NOW)
+    assert err is not None
+
+
+def test_validate_rrule_monthly_bymonthday_and_byday_mutually_exclusive():
+    err = validate_rrule("FREQ=MONTHLY;BYMONTHDAY=15;BYDAY=1FR", NOW)
+    assert err is not None
+    assert "mutually exclusive" in err
+
+
+def test_validate_rrule_monthly_with_interval_ok():
+    assert validate_rrule("FREQ=MONTHLY;INTERVAL=3", NOW) is None
+
+
+def test_validate_rrule_monthly_unknown_key_rejected():
+    err = validate_rrule("FREQ=MONTHLY;COUNT=5", NOW)
+    assert err is not None
+    assert "COUNT" in err
 
 
 def test_validate_rrule_typo_returns_error():

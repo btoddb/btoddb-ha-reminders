@@ -19,10 +19,12 @@
 # model will claim they are impossible unless the function schema exposes an explicit
 # recurrence argument. For "every day at 2 PM", pass the next 2 PM as `when` and
 # `rrule: FREQ=DAILY`; for "every Monday at 9 AM", pass the next Monday at 9 AM and
-# `rrule: FREQ=WEEKLY;BYDAY=MO`. For "every other"/"every Nth" cadences, append
-# `;INTERVAL=N` — "every week" -> omit (or INTERVAL=1), "every other week" ->
-# INTERVAL=2, "every third week" -> INTERVAL=3, "every fourth week" -> INTERVAL=4,
-# etc; the same mapping applies to daily.
+# `rrule: FREQ=WEEKLY;BYDAY=MO`. For monthly cadences: `FREQ=MONTHLY;BYMONTHDAY=15`
+# fires on the 15th of every month (use 1–28 only), `FREQ=MONTHLY;BYMONTHDAY=-1`
+# fires on the last day of each month, and `FREQ=MONTHLY;BYDAY=1FR` fires on the first
+# Friday (prefix 1/2/3/4/-1 = first/second/third/fourth/last; FR/MO/TU etc. for day).
+# For "every other"/"every Nth" cadences, append `;INTERVAL=N` — the same mapping
+# applies to daily, weekly, and monthly.
 
 - spec:
     name: create_reminder
@@ -34,11 +36,16 @@
       "next Tuesday at 2pm") pass when as an absolute ISO 8601 local datetime
       resolved from the current time shown in the system prompt. For recurring
       requests, do not refuse: pass when as the first desired occurrence and pass
-      rrule as "FREQ=DAILY" for "every day"/"daily", or
+      rrule as "FREQ=DAILY" for "every day"/"daily",
       "FREQ=WEEKLY;BYDAY=MO" for "every Monday"/weekly requests (replace MO with
-      TU/WE/TH/FR/SA/SU as needed). For "every other"/"every Nth" cadences append
-      ";INTERVAL=N" to rrule: "every other week" -> INTERVAL=2, "every third week"
-      -> INTERVAL=3, "every fourth week" -> INTERVAL=4, etc (same for daily).
+      TU/WE/TH/FR/SA/SU as needed),
+      "FREQ=MONTHLY;BYMONTHDAY=15" for "the 15th of every month" (days 1–28 only),
+      "FREQ=MONTHLY;BYMONTHDAY=-1" for "last day of every month", or
+      "FREQ=MONTHLY;BYDAY=1FR" for "first Friday of every month" (prefix 1/2/3/4/-1
+      = first/second/third/fourth/last; weekday MO/TU/WE/TH/FR/SA/SU).
+      For "every other"/"every Nth" cadences append
+      ";INTERVAL=N" to rrule: "every other week" -> INTERVAL=2, "every third month"
+      -> INTERVAL=3, "quarterly" -> INTERVAL=3 with FREQ=MONTHLY; same for daily.
       Always pass message, and put ONLY the task in
       it — strip the "remind me" framing and the schedule. From "remind me every
       day at noon to drink a beer" pass message "drink a beer" (the "every day"
@@ -67,7 +74,17 @@
             "tomorrow", or "at 6pm" — those belong in when / in_minutes / rrule.
         rrule:
           type: string
-          description: Optional recurrence rule. Use FREQ=DAILY for "every day"/"daily"; use FREQ=WEEKLY;BYDAY=MO for weekly reminders, replacing MO with TU/WE/TH/FR/SA/SU. For "every other"/"every Nth" cadences append ";INTERVAL=N" ("every other week" -> INTERVAL=2, "every third week" -> INTERVAL=3, "every fourth week" -> INTERVAL=4, etc; same for daily). Set when to the first occurrence. Omit for one-time reminders.
+          description: >-
+            Optional recurrence rule. Use FREQ=DAILY for "every day"/"daily";
+            FREQ=WEEKLY;BYDAY=MO for weekly reminders (replace MO with
+            TU/WE/TH/FR/SA/SU). For monthly reminders: FREQ=MONTHLY;BYMONTHDAY=15
+            for a fixed day of month (1–28 only), FREQ=MONTHLY;BYMONTHDAY=-1 for
+            the last day of month, or FREQ=MONTHLY;BYDAY=1FR for the first Friday
+            (ordinal prefix 1/2/3/4/-1 = first/second/third/fourth/last; any
+            weekday MO/TU/WE/TH/FR/SA/SU). For "every other"/"every Nth" cadences
+            append ";INTERVAL=N" (e.g. INTERVAL=2 for every other, INTERVAL=3 for
+            quarterly with FREQ=MONTHLY). Set when to the first occurrence. Omit
+            for one-time reminders.
       required: [message]
   function:
     type: script
