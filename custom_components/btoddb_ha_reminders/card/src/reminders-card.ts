@@ -706,21 +706,30 @@ export class BtoddbRemindersCard extends LitElement {
     return rrule;
   }
 
+  private _renderSwitch(checked: boolean, onChange: (val: boolean) => void) {
+    return html`
+      <label class="repeat-switch">
+        <input
+          type="checkbox"
+          role="switch"
+          .checked=${checked}
+          @change=${(e: Event) =>
+            onChange((e.target as HTMLInputElement).checked)}
+        />
+        <span class="repeat-switch-track"
+          ><span class="repeat-switch-thumb"></span
+        ></span>
+        <span class="repeat-switch-label">Repeat</span>
+      </label>
+    `;
+  }
+
   private _renderRepeatDisclosure() {
     return html`
       <div class="repeat-row">
-        <button
-          type="button"
-          class="repeat-toggle"
-          @click=${() => {
-            this._repeatOpen = !this._repeatOpen;
-          }}
-        >
-          <ha-icon
-            icon=${this._repeatOpen ? "mdi:chevron-down" : "mdi:chevron-right"}
-          ></ha-icon>
-          Repeat
-        </button>
+        ${this._renderSwitch(this._repeatOpen, (v) => {
+          this._repeatOpen = v;
+        })}
         ${this._repeatOpen
           ? html`
               <div class="repeat-body">
@@ -884,14 +893,9 @@ export class BtoddbRemindersCard extends LitElement {
           </button>
         </div>
         <div class="repeat-row">
-          <button
-            type="button"
-            class="repeat-toggle ${this._locPersistent ? "active" : ""}"
-            @click=${() => { this._locPersistent = !this._locPersistent; }}
-          >
-            <ha-icon icon="mdi:repeat"></ha-icon>
-            Repeat
-          </button>
+          ${this._renderSwitch(this._locPersistent, (v) => {
+            this._locPersistent = v;
+          })}
         </div>
       </div>
     `;
@@ -1249,26 +1253,62 @@ export class BtoddbRemindersCard extends LitElement {
       color: var(--secondary-text-color, #727272);
       flex: 0 0 auto;
     }
-    /* Repeat disclosure */
+    /* Repeat toggle switch */
     .repeat-row {
       padding-top: 6px;
     }
-    .repeat-toggle {
+    .repeat-switch {
       display: flex;
       align-items: center;
-      gap: 4px;
-      background: none;
-      border: none;
-      padding: 0;
+      gap: 8px;
       cursor: pointer;
-      color: var(--secondary-text-color, #727272);
-      font-family: inherit;
       font-size: 13px;
+      user-select: none;
     }
-    .repeat-toggle:hover {
-      color: var(--primary-color, #03a9f4);
+    .repeat-switch input[type="checkbox"] {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
     }
-    .repeat-toggle.active {
+    .repeat-switch-track {
+      position: relative;
+      width: 36px;
+      height: 20px;
+      background: var(--divider-color, #e0e0e0);
+      border-radius: 10px;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+    .repeat-switch input:checked ~ .repeat-switch-track {
+      background: var(--primary-color, #03a9f4);
+    }
+    .repeat-switch-thumb {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 16px;
+      height: 16px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    .repeat-switch input:checked ~ .repeat-switch-track .repeat-switch-thumb {
+      transform: translateX(16px);
+    }
+    .repeat-switch input:focus-visible ~ .repeat-switch-track {
+      outline: 2px solid var(--primary-color, #03a9f4);
+      outline-offset: 2px;
+    }
+    .repeat-switch-label {
+      color: var(--secondary-text-color, #727272);
+    }
+    .repeat-switch:has(input:checked) .repeat-switch-label {
       color: var(--primary-color, #03a9f4);
     }
     .repeat-body {
