@@ -241,6 +241,8 @@ export class BtoddbRemindersCard extends LitElement {
     _busy: { state: true },
     _error: { state: true },
     _editingUid: { state: true },
+    _timeCollapsed: { state: true },
+    _locationCollapsed: { state: true },
   };
 
   hass!: Hass;
@@ -265,6 +267,8 @@ export class BtoddbRemindersCard extends LitElement {
   private _busy = false;
   private _error = "";
   private _editingUid = "";
+  private _timeCollapsed = false;
+  private _locationCollapsed = false;
 
   private _entity = DEFAULT_ENTITY;
   private _lastSignature = "";
@@ -285,7 +289,9 @@ export class BtoddbRemindersCard extends LitElement {
 
   getCardSize(): number {
     const locCount = this._locationItems().length;
-    return 3 + Math.min(this._items.length + locCount, 8);
+    const timeSize = this._timeCollapsed ? 1 : this._items.length;
+    const locSize = this._locationCollapsed ? 1 : locCount;
+    return 3 + Math.min(timeSize + locSize, 8);
   }
 
   connectedCallback(): void {
@@ -1140,13 +1146,28 @@ export class BtoddbRemindersCard extends LitElement {
     `;
   }
 
-  /** Bold, labeled heading for reminder groups. */
-  private _renderSectionHeading(label: string, icon: string) {
+  /** Bold, labeled heading for reminder groups; clicking toggles collapse. */
+  private _renderSectionHeading(
+    label: string,
+    icon: string,
+    count: number,
+    collapsed: boolean,
+    onToggle: () => void,
+  ) {
     return html`
-      <div class="section-heading">
+      <button
+        class="section-heading"
+        aria-expanded=${collapsed ? "false" : "true"}
+        @click=${onToggle}
+      >
         <ha-icon icon=${icon}></ha-icon>
-        <span>${label}</span>
-      </div>
+        <span class="section-heading-label">${label}</span>
+        <span class="section-heading-count">${count}</span>
+        <ha-icon
+          class="section-heading-chevron ${collapsed ? "collapsed" : ""}"
+          icon="mdi:chevron-down"
+        ></ha-icon>
+      </button>
     `;
   }
 
@@ -1231,13 +1252,13 @@ export class BtoddbRemindersCard extends LitElement {
         : html`
                 <div class="list">
                   ${this._items.length
-          ? this._renderSectionHeading("Time", "mdi:alarm")
+          ? this._renderSectionHeading("Time", "mdi:alarm", this._items.length, this._timeCollapsed, () => { this._timeCollapsed = !this._timeCollapsed; })
           : nothing}
-                  ${this._renderTimeRows()}
+                  ${this._timeCollapsed ? nothing : this._renderTimeRows()}
                   ${locItems.length
-          ? this._renderSectionHeading("Location", "mdi:map-marker")
+          ? this._renderSectionHeading("Location", "mdi:map-marker", locItems.length, this._locationCollapsed, () => { this._locationCollapsed = !this._locationCollapsed; })
           : nothing}
-                  ${[...locUndelivered, ...locDelivered].map((item, i) =>
+                  ${this._locationCollapsed ? nothing : [...locUndelivered, ...locDelivered].map((item, i) =>
           this._renderLocationItem(item, this._items.length > 0 && i === 0),
         )}
                 </div>
@@ -1399,21 +1420,35 @@ export class BtoddbRemindersCard extends LitElement {
     .item.section-first {
       border-top: none;
     }
-    /* Filled, tinted banner for reminder groups. */
+    /* Filled, tinted banner for reminder groups; acts as a collapse toggle. */
     .section-heading {
       display: flex;
       align-items: center;
       gap: 8px;
+      width: 100%;
       margin: 14px 0 2px;
       padding: 9px 12px;
-      border-radius: 8px;
+      border-top: none;
+      border-right: none;
+      border-bottom: none;
       border-left: 4px solid var(--primary-color, #03a9f4);
+      border-radius: 8px;
       background: color-mix(in srgb, var(--primary-color, #03a9f4) 14%, transparent);
       color: var(--primary-color, #03a9f4);
       font-size: 12px;
+      font-family: inherit;
       font-weight: 700;
       letter-spacing: 0.07em;
       text-transform: uppercase;
+      cursor: pointer;
+      box-sizing: border-box;
+    }
+    .section-heading:hover {
+      background: color-mix(in srgb, var(--primary-color, #03a9f4) 20%, transparent);
+    }
+    .section-heading:focus-visible {
+      outline: 2px solid var(--primary-color, #03a9f4);
+      outline-offset: 2px;
     }
     .list > .section-heading:first-child {
       margin-top: 0;
@@ -1423,6 +1458,23 @@ export class BtoddbRemindersCard extends LitElement {
       width: 18px;
       height: 18px;
       color: var(--primary-color, #03a9f4);
+    }
+    .section-heading-label {
+      flex: 1 1 auto;
+    }
+    .section-heading-count {
+      font-weight: 400;
+      font-size: 11px;
+      opacity: 0.7;
+      text-transform: none;
+      letter-spacing: normal;
+    }
+    .section-heading-chevron {
+      transition: transform 0.2s;
+      flex-shrink: 0;
+    }
+    .section-heading-chevron.collapsed {
+      transform: rotate(-90deg);
     }
     .leading {
       color: var(--state-icon-color, var(--primary-color, #03a9f4));
