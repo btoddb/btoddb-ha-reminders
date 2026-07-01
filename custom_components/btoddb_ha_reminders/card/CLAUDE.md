@@ -17,6 +17,11 @@ The Lovelace cards for the Reminders integration.
   native `<select>` for enter/leave + native `<button>`) calls
   `btoddb_ha_reminders.create_location`. The `persistent` flag (re-fire on every matching
   zone transition instead of once) is exposed as a **Repeat** toggle button below the row.
+- The **Time** and **Location** section headings in the list are independently
+  collapsible — clicking a heading (which shows a count badge and a chevron twisty) toggles
+  `_timeCollapsed` / `_locationCollapsed` state, hiding or showing the rows for that group.
+  The chevron rotates 90° when collapsed. `getCardSize()` counts a collapsed section as 1
+  row so HA's masonry layout stays compact.
 - A single merged list shows both kinds of reminder:
   - Time reminders read from the `calendar.btoddb_reminders` entity via the calendar REST
     API (`GET calendars/<entity>?start=&end=`); deleted via the `calendar/event/delete`
