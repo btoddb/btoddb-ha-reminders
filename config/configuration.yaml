@@ -9,10 +9,4 @@ homeassistant:
 logger:
   default: info
   logs:
-    custom_components.room_climate_controller: debug
-    custom_components.dreo: warn
-
-smart_tcl_portable_ac:
-# this causes HA to load a custom component that patches the missing HVAC nodes for this A/C
-# can be removed once https://github.com/home-assistant/core/pull/172950 is merged
-
+    custom_components.btoddb_ha_reminders: debug
