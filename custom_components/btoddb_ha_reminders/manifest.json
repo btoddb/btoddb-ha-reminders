@@ -12,10 +12,10 @@
     "person",
     "zone"
   ],
-  "documentation": "https://github.com/btoddb/btoddb-ha-reminders",
+  "documentation": "https://github.com/btoddb/ha-reminders",
   "integration_type": "service",
   "iot_class": "local_push",
-  "issue_tracker": "https://github.com/btoddb/btoddb-ha-reminders/issues",
+  "issue_tracker": "https://github.com/btoddb/ha-reminders/issues",
   "loggers": [
     "custom_components.btoddb_ha_reminders"
   ],

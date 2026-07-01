@@ -904,7 +904,7 @@ var j=globalThis,q=j.ShadowRoot&&(j.ShadyCSS===void 0||j.ShadyCSS.nativeShadow)&
       font-family: inherit;
       font-size: 14px;
     }
-  `;customElements.get("btoddb-reminders-card")||customElements.define("btoddb-reminders-card",Y);var pt="v0.0.69";console.info(`%c BTODDB-HA-REMINDERS %c ${pt} `,"color: white; background: #03a9f4; font-weight: 700;","color: #03a9f4; background: white; font-weight: 700;");window.customCards=window.customCards||[];window.customCards.push({type:"btoddb-reminders-card",name:"BToddB Reminders",description:"Create reminders and see the upcoming ones.",preview:!1,documentationURL:"https://github.com/btoddb/btoddb-ha-reminders"});window.customCards.push({type:"btoddb-calendar-list-card",name:"BToddB Calendar List",description:"Show calendars and reminders as a compact agenda.",preview:!1,documentationURL:"https://github.com/btoddb/btoddb-ha-reminders"});
+  `;customElements.get("btoddb-reminders-card")||customElements.define("btoddb-reminders-card",Y);var pt="v0.0.69";console.info(`%c BTODDB-HA-REMINDERS %c ${pt} `,"color: white; background: #03a9f4; font-weight: 700;","color: #03a9f4; background: white; font-weight: 700;");window.customCards=window.customCards||[];window.customCards.push({type:"btoddb-reminders-card",name:"BToddB Reminders",description:"Create reminders and see the upcoming ones.",preview:!1,documentationURL:"https://github.com/btoddb/ha-reminders"});window.customCards.push({type:"btoddb-calendar-list-card",name:"BToddB Calendar List",description:"Show calendars and reminders as a compact agenda.",preview:!1,documentationURL:"https://github.com/btoddb/ha-reminders"});
 /*! Bundled license information:
 
 @lit/reactive-element/css-tag.js:
