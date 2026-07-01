@@ -1,6 +1,6 @@
 # Location/Zone Based Reminders
 
-Implement https://github.com/btoddb/btoddb-ha-reminders/issues/2
+Implement https://github.com/btoddb/ha-reminders/issues/2
 
 **Status:** implemented (see `requirements/spec/reminders.md` LOC-* rules)
 **Touches:** location-based
