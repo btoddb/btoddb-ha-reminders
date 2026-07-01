@@ -2,7 +2,7 @@
 
 `@btb` command routing, phase boundaries, shared tool defaults, and ship
 semantics are owned by the reusable workflow in
-`btoddb/claude-pipeline/.github/workflows/btb.yml@v1`.
+`btoddb/btb-pipeline/.github/workflows/btb.yml@v1`.
 
 This repository's `.github/workflows/btb-client.yml` is only the thin event caller
 for that reusable workflow. Do not paste the shared command contract into this

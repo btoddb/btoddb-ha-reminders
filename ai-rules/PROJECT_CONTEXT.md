@@ -62,11 +62,11 @@ There are **two independent version numbers**:
 ## Shared Pipeline
 
 The shared `@btb` command contract is injected at runtime by
-`btoddb/claude-pipeline`. Do not paste that shared workflow behavior into this
+`btoddb/btb-pipeline`. Do not paste that shared workflow behavior into this
 repo; copied contract text drifts as the pipeline evolves.
 
 This repo's `.github/workflows/btb-client.yml` should stay a tiny caller of
-`btoddb/claude-pipeline/.github/workflows/btb.yml@v1`. Put only local facts in
+`btoddb/btb-pipeline/.github/workflows/btb.yml@v1`. Put only local facts in
 this file and the other `ai-rules` files.
 
 ## Codex Rules
@@ -78,4 +78,4 @@ this file and the other `ai-rules` files.
 - Run the relevant tests, lint, and validation commands before committing when
   the local environment supports them.
 - Keep client repository guidance local and specific; shared `@btb` behavior
-  belongs in `btoddb/claude-pipeline`.
+  belongs in `btoddb/btb-pipeline`.

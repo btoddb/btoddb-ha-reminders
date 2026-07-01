@@ -25,7 +25,7 @@ concurrency:
 
 jobs:
   btb:
-    uses: btoddb/claude-pipeline/.github/workflows/btb.yml@v1
+    uses: btoddb/btb-pipeline/.github/workflows/btb.yml@v1
     permissions:
       contents: write
       pull-requests: write
