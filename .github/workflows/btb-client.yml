@@ -1,7 +1,7 @@
-# Thin per-repo caller for the shared `@btb` pipeline.
+# Thin per-repo caller for the shared `/btbai` pipeline.
 #
 # This is the active event-entry workflow for this repository. Keep repo-specific
-# agent guidance in AGENTS.md and ai-rules files; the shared @btb command
+# agent guidance in AGENTS.md and ai-rules files; the shared /btbai command
 # contract is injected by the reusable workflow at runtime.
 #
 # Event triggers and concurrency MUST live in the caller — a reusable workflow
